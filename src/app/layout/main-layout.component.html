@@ -1,0 +1,47 @@
+<div class="app-shell">
+  <header class="top-header">
+    <div class="header-left">
+      <div class="brand">
+        <div class="logo-mark">
+          <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="24" fill="#0a5c36"/>
+            <path d="M24 12c-4.4 0-8 3.6-8 8 0 2.5 1.2 4.7 3 6.1V28h10v-1.9c1.8-1.4 3-3.6 3-6.1 0-4.4-3.6-8-8-8zm-3 18h6v2h-6v-2z" fill="#fff"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-sub">DIGITAL BANGLADESH</span>
+          <span class="brand-name">Digital Municipality Services</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="user-info">
+        <div class="avatar">{{ userName().charAt(0) }}</div>
+        <div class="user-meta">
+          <span class="user-name">{{ userName() }}</span>
+          <span class="user-muni">{{ municipality() }}</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        @if (isAdmin()) {
+          <button class="icon-btn" title="Admin Menu" (click)="toggleAdminMenu()">⚙</button>
+        }
+        <button class="icon-btn" title="Logout" (click)="logout()">⏻</button>
+      </div>
+      @if (showAdminMenu() && isAdmin()) {
+        <div class="admin-dropdown">
+          <div class="dropdown-title">Admin Menu</div>
+          @for (item of adminItems; track item.path) {
+            <a [routerLink]="item.path" class="dropdown-item" (click)="showAdminMenu.set(false)">{{ item.label }}</a>
+          }
+        </div>
+      }
+    </div>
+  </header>
+  <nav class="main-nav">
+    @for (item of navItems(); track item.path) {
+      <a [routerLink]="item.path" routerLinkActive="active" class="nav-link">{{ item.label }}</a>
+    }
+  </nav>
+  <main class="main-content"><router-outlet /></main>
+</div>

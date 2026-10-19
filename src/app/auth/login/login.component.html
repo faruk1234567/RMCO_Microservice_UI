@@ -1,0 +1,83 @@
+<div class="login-page">
+  <div class="login-bg"></div>
+  <div class="login-card">
+    <div class="logo-area">
+      <div class="logo-circle">
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="24" fill="#0a5c36"/>
+          <path d="M24 12c-4.4 0-8 3.6-8 8 0 2.5 1.2 4.7 3 6.1V28h10v-1.9c1.8-1.4 3-3.6 3-6.1 0-4.4-3.6-8-8-8zm-3 18h6v2h-6v-2z" fill="#fff"/>
+        </svg>
+      </div>
+      <div class="brand">
+        <div class="brand-top">DIGITAL BANGLADESH</div>
+        <h1>Digital Municipality Services</h1>
+      </div>
+    </div>
+
+    <div class="lock-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0a5c36" stroke-width="2">
+        <rect x="3" y="11" width="18" height="11" rx="2"/>
+        <path d="M7 11V7a5 5 0 0110 0v4"/>
+      </svg>
+    </div>
+
+    @if (errorMsg()) {
+      <div class="alert alert-danger">{{ errorMsg() }}</div>
+    }
+
+    <form (ngSubmit)="onSubmit()" autocomplete="off">
+      @if (!needsMunicipalitySelect()) {
+        <div class="form-group">
+          <input
+            type="text"
+            class="form-control"
+            placeholder="ID / মোবাইল / ইমেইল"
+            [(ngModel)]="loginId"
+            name="loginId"
+            autofocus
+          />
+        </div>
+        <div class="form-group">
+          <input
+            type="password"
+            class="form-control"
+            placeholder="Password"
+            [(ngModel)]="password"
+            name="password"
+          />
+        </div>
+      }
+
+      @if (needsMunicipalitySelect()) {
+        <div class="alert alert-info" style="font-size:0.88rem">
+          একাধিক পৌরসভায় একাউন্ট আছে। যেটি দিয়ে লগইন করবেন সিলেক্ট করুন।
+        </div>
+        <div class="form-group">
+          <select class="form-control" [(ngModel)]="selectedMunicipality" name="municipality">
+            <option value="">-- পৌরসভা নির্বাচন করুন --</option>
+            @for (m of availableMunicipalities(); track m.id) {
+              <option [value]="m.id">{{ m.nameBn }}{{ m.nameEn ? ' (' + m.nameEn + ')' : '' }}</option>
+            }
+          </select>
+        </div>
+      }
+
+      <button type="submit" class="btn btn-primary btn-block btn-lg" [disabled]="loading()">
+        @if (loading()) { লগইন হচ্ছে... } @else { Login }
+      </button>
+    </form>
+
+    <div class="login-links">
+      <a routerLink="/platform-login">Platform Admin Login</a>
+      <span class="sep">|</span>
+
+      <a routerLink="/register">Sign Up</a>
+      <span class="sep">|</span>
+      <a href="#">Help</a>
+      <span class="sep">|</span>
+      <a routerLink="/forgot-password">Forgot ID?</a>
+      <span class="sep">|</span>
+      <a routerLink="/forgot-password">Forgot PWD?</a>
+    </div>
+  </div>
+</div>

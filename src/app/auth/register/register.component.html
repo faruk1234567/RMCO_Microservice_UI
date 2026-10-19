@@ -1,0 +1,106 @@
+<div class="login-page">
+  <div class="login-bg"></div>
+  <div class="login-card wide">
+    <div class="logo-area">
+      <h1>নিবন্ধন / Sign Up</h1>
+      <p class="text-muted">ধাপ {{ step() }} / ৫</p>
+    </div>
+    <div class="steps">
+      @for (s of [1,2,3,4,5]; track s) {
+        <div class="step-bar" [class.active]="s <= step()"></div>
+      }
+    </div>
+
+    @if (errorMsg()) { <div class="alert alert-danger">{{ errorMsg() }}</div> }
+    @if (infoMsg()) { <div class="alert alert-success">{{ infoMsg() }}</div> }
+
+    @if (step() === 1) {
+      <div class="alert alert-info">
+        <strong>নীতিমালা / Policy</strong><br>
+        এই সিস্টেম ব্যবহার করার আগে নীতিমালা পড়ুন এবং সম্মত হোন। (বাংলা + English একসাথে)
+      </div>
+      <label class="check-label">
+        <input type="checkbox" [(ngModel)]="policyAccepted" /> আমি সম্মত / I Agree
+      </label>
+      <button class="btn btn-primary btn-block" [disabled]="!policyAccepted" (click)="next()">পরবর্তী</button>
+    }
+
+    @if (step() === 2) {
+      <div class="form-group">
+        <label>পৌরসভা নির্বাচন <span class="required">*</span></label>
+        <select class="form-control" [(ngModel)]="municipalityId">
+          <option value="">-- বাছাই করুন --</option>
+          @for (m of municipalities; track m.id) {
+            <option [value]="m.id">{{ m.nameBn }} ({{ m.nameEn }})</option>
+          }
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" (click)="prev()">পিছনে</button>
+        <button class="btn btn-primary grow" [disabled]="!municipalityId || loading()" (click)="next()">পরবর্তী</button>
+      </div>
+    }
+
+    @if (step() === 3) {
+      <div class="form-group">
+        <label>মোবাইল নম্বর <span class="required">*</span></label>
+        <input class="form-control" placeholder="01XXXXXXXXX" [(ngModel)]="mobile" maxlength="11" />
+        <span class="hint">এই পৌরসভায় নম্বর আগে থেকে আছে কিনা যাচাই করা হবে</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" (click)="prev()" [disabled]="loading()">পিছনে</button>
+        <button class="btn btn-primary grow" [disabled]="mobile.length < 11 || loading()" (click)="next()">
+          {{ loading() ? 'যাচাই হচ্ছে...' : 'OTP পাঠান' }}
+        </button>
+      </div>
+    }
+
+    @if (step() === 4) {
+      <div class="form-group">
+        <label>OTP কোড <span class="required">*</span></label>
+        <input class="form-control" placeholder="৬ সংখ্যার কোড" [(ngModel)]="otp" maxlength="6" />
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" (click)="prev()" [disabled]="loading()">পিছনে</button>
+        <button class="btn btn-primary grow" [disabled]="otp.length < 6 || loading()" (click)="next()">
+          {{ loading() ? 'যাচাই হচ্ছে...' : 'যাচাই করুন' }}
+        </button>
+      </div>
+    }
+
+    @if (step() === 5) {
+      <div class="form-row">
+        <div class="form-group">
+          <label>নাম (বাংলা) <span class="required">*</span></label>
+          <input class="form-control" [(ngModel)]="nameBn" />
+        </div>
+        <div class="form-group">
+          <label>Name (English)</label>
+          <input class="form-control" [(ngModel)]="nameEn" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>ইমেইল (ঐচ্ছিক)</label>
+        <input class="form-control" type="email" [(ngModel)]="email" />
+      </div>
+      <div class="form-group">
+        <label>পাসওয়ার্ড <span class="required">*</span></label>
+        <input type="password" class="form-control" [(ngModel)]="password" />
+      </div>
+      <div class="form-group">
+        <label>পাসওয়ার্ড আবার <span class="required">*</span></label>
+        <input type="password" class="form-control" [(ngModel)]="password2" />
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" (click)="prev()" [disabled]="loading()">পিছনে</button>
+        <button class="btn btn-primary grow" [disabled]="loading()" (click)="submit()">
+          {{ loading() ? 'জমা হচ্ছে...' : 'জমা দিন' }}
+        </button>
+      </div>
+    }
+
+    <div class="login-links">
+      <a routerLink="/login">ইতিমধ্যে একাউন্ট আছে? লগইন করুন</a>
+    </div>
+  </div>
+</div>

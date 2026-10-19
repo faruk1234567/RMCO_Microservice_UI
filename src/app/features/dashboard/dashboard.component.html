@@ -1,0 +1,42 @@
+<div class="page-container">
+  <div class="page-header">
+    <h1>হোম ড্যাশবোর্ড</h1>
+    <a routerLink="/committee/create" class="btn btn-primary">+ নতুন কমিটি খসড়া</a>
+  </div>
+  <div class="stats-grid">
+    @for (w of widgets(); track w.title) {
+      <a [routerLink]="w.path" class="stat-card" [style.--accent]="w.color">
+        <div class="stat-count">{{ w.count }}</div>
+        <div class="stat-title">{{ w.title }}</div>
+        <div class="stat-desc">{{ w.desc }}</div>
+      </a>
+    }
+  </div>
+  <div class="dash-grid">
+    <div class="card">
+      <div class="card-header"><h3>সাম্প্রতিক কার্যক্রম</h3></div>
+      <div class="card-body">
+        <ul class="activity-list">
+          @for (a of recentActivities; track a.time) {
+            <li>
+              <div class="activity-dot"></div>
+              <div class="activity-content">
+                <strong>{{ a.action }}</strong> — {{ a.target }}
+                <div class="activity-meta">{{ a.user }} · {{ a.time }}</div>
+              </div>
+            </li>
+          }
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>দ্রুত অ্যাকশন</h3></div>
+      <div class="card-body quick-actions">
+        <a routerLink="/committee/create" class="quick-btn"><span class="qa-icon">📝</span><span>নতুন কমিটি খসড়া</span></a>
+        <a routerLink="/workflow" class="quick-btn"><span class="qa-icon">✅</span><span>অনুমোদন অনুরোধ</span></a>
+        <a routerLink="/document" class="quick-btn"><span class="qa-icon">📄</span><span>নথি আপলোড</span></a>
+        <a routerLink="/config/types" class="quick-btn"><span class="qa-icon">⚙️</span><span>কনফিগ সেটিংস</span></a>
+      </div>
+    </div>
+  </div>
+</div>
