@@ -18,17 +18,50 @@ import { AdminService } from '../../../core/services/admin.service';
 
       <div class="card mb-2">
         <div class="card-body">
-          <div class="form-row" style="align-items:flex-end">
-            <div class="form-group grow">
-              <label>সার্চ (নাম / মোবাইল / ইমেইল)</label>
-              <input class="form-control" [(ngModel)]="query" placeholder="খুঁজুন..."
-                (keyup.enter)="search()" />
-            </div>
-            <button class="btn btn-primary" [disabled]="searching()" (click)="search()">
-              {{ searching() ? 'খুঁজছে...' : 'সার্চ' }}
-            </button>
-          </div>
-        </div>
+
+  <!-- Municipality নির্বাচন -->
+  <div class="form-group">
+    <label>Municipality নির্বাচন করুন</label>
+
+    <select
+      class="form-control"
+      [(ngModel)]="selectedMunicipalityId"
+    >
+      <option [ngValue]="null">
+        -- Municipality নির্বাচন করুন --
+      </option>
+
+      @for (m of municipalities(); track m.id) {
+        <option [ngValue]="m.id">
+          {{ m.nameBn || m.nameEn || m.name || m.code }}
+        </option>
+      }
+    </select>
+  </div>
+
+  <!-- User Search -->
+  <div class="form-row" style="align-items:flex-end">
+    <div class="form-group grow">
+      <label>সার্চ (নাম / মোবাইল / ইমেইল)</label>
+
+      <input
+        class="form-control"
+        [(ngModel)]="query"
+        placeholder="খুঁজুন..."
+        (keyup.enter)="search()"
+      />
+    </div>
+
+    <button
+      class="btn btn-primary"
+      [disabled]="searching()"
+      (click)="search()"
+    >
+      {{ searching() ? 'খুঁজছে...' : 'সার্চ' }}
+    </button>
+  </div>
+
+</div>
       </div>
 
       @if (users().length) {
@@ -48,7 +81,7 @@ import { AdminService } from '../../../core/services/admin.service';
                 @for (u of users(); track u.id || u.userId) {
                   <tr>
                     <td>{{ u.nameBn || u.name_bn || u.fullName || u.name || '—' }}</td>
-                    <td>{{ u.mobile || u.mobileNormalized || '—' }}</td>
+                    <td>{{ u.mobileMasked || u.mobile || u.mobileNormalized || '—' }}</td>
                     <td>{{ u.email || u.emailNormalized || '—' }}</td>
                     <td>
                       <span class="badge" [class]="statusClass(u.status)">
@@ -153,26 +186,22 @@ export class UserAdminComponent {
   profile = signal<any>(null);
   userRoles = signal<any[] | null>(null);
   rolesLoading = signal(false);
+  municipalities = signal<any[]>([]);
+selectedMunicipalityId: number | null = null;
 
   constructor(private admin: AdminService) {}
 
   search() {
-    if (!this.query.trim()) return;
-    this.searching.set(true);
-    this.errorMsg.set('');
-    this.admin.searchUsers(this.query.trim()).subscribe({
-      next: (res) => {
-        const list = Array.isArray(res) ? res : res?.data || res?.content || res?.users || [];
-        this.users.set(list);
-        this.searching.set(false);
-        if (!list.length) this.errorMsg.set('কোনো ব্যবহারকারী পাওয়া যায়নি।');
-      },
-      error: (err) => {
-        this.searching.set(false);
-        this.errorMsg.set(err?.error?.message || 'সার্চ ব্যর্থ।');
-      },
-    });
-  }
+  if (!this.query.trim()) return;
+
+  this.searching.set(true);
+  this.errorMsg.set('');
+
+  // আপাতত আগের সার্চের মতো শুধু query পাঠানো যাবে না।
+  // AdminService এখন municipalityId বাধ্যতামূলক করেছে।
+  this.searching.set(false);
+  this.errorMsg.set('সার্চের আগে Municipality নির্বাচন করার ব্যবস্থা প্রয়োজন।');
+}
 
   viewProfile(u: any) {
     const id = u.id || u.userId;

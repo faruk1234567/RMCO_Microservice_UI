@@ -26,22 +26,26 @@ export class MainLayoutComponent implements OnInit {
     return u?.nameBn || u?.nameEn || 'ব্যবহারকারী';
   });
 
-  municipality = computed(() => {
-    const user = this.auth.currentUser();
-    const municipalityId = user?.municipalityId;
+ municipality = computed(() => {
+  const user = this.auth.currentUser();
+  const municipalityId = user?.municipalityId;
 
-    if (municipalityId == null) {
-      return 'প্ল্যাটফর্ম প্রশাসক';
-    }
+  // Global Citizen বা platform-level account-এর municipality নেই
+  if (municipalityId == null) {
+    return 'কোনো পৌরসভা নির্বাচিত হয়নি';
+  }
 
-    const found = this.municipalities().find(
-      (m: any) => String(m.municipalityId ?? m.id) === String(municipalityId)
-    );
+  const found = this.municipalities().find(
+    (m: any) =>
+      String(m.municipalityId ?? m.id) === String(municipalityId)
+  );
 
-    return found
-      ? ((found as any).nameBn || (found as any).nameEn || 'পৌরসভা')
-      : (this.municipalityLoading() ? 'লোড হচ্ছে...' : 'পৌরসভার তথ্য পাওয়া যায়নি');
-  });
+  return found
+    ? (found.nameBn || found.nameEn || 'পৌরসভা')
+    : (this.municipalityLoading()
+        ? 'লোড হচ্ছে...'
+        : 'পৌরসভার তথ্য পাওয়া যায়নি');
+});
 
   isAdmin = computed(() =>
     this.auth.hasAnyRole(
@@ -62,19 +66,38 @@ export class MainLayoutComponent implements OnInit {
     )
   );
 
-  navItems = computed(() => {
-    const items = [
-      { path: '/dashboard', label: 'HOME' },
-      { path: '/committee', label: 'কমিটি' },
-    ];
+  
+navItems = computed(() => {
+  const items: { path: string; label: string }[] = [
+    { path: '/dashboard', label: 'HOME' },
+    { path: '/committee', label: 'কমিটি' },
+  ];
 
-    if (this.isApprover()) {
-      items.push({ path: '/workflow', label: 'অনুমোদন' });
-    }
+  if (this.isApprover()) {
+    items.push({ path: '/workflow', label: 'অনুমোদন' });
+  }
 
-    items.push({ path: '/document', label: 'নথি' });
-    return items;
-  });
+  items.push({ path: '/document', label: 'নথি' });
+
+  // Holding Tax menu: permission থাকলে দেখাবে
+  if (this.auth.hasPermission('holding.tax.view')) {
+    items.push({
+      path: '/holding-tax',
+      label: 'হোল্ডিং ট্যাক্স',
+    });
+  }
+
+  // Assessment menu: assessment permission থাকলে দেখাবে
+  if (this.auth.hasPermission('holding.tax.assessment.view')) {
+    items.push({
+      path: '/holding-tax/assessment',
+      label: 'কর নির্ধারণ',
+    });
+  }
+
+  return items;
+});
+
 
   adminItems = [
     { path: '/admin/roles', label: 'রোল ব্যবস্থাপনা' },

@@ -1,3 +1,4 @@
+
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
@@ -9,59 +10,138 @@ export class AdminService {
 
   constructor(private http: HttpClient) {}
 
+  // ─── Municipalities ─────────────────────────────────────
+
+  /** GET /platform/municipalities */
+  getMunicipalities(): Observable<any> {
+    return this.http.get(`${this.base}/platform/municipalities`);
+  }
+
   // ─── Roles ──────────────────────────────────────────────
-  /** GET /admin/roles */
-  getRoles(): Observable<any> {
-    return this.http.get(`${this.base}/admin/roles`);
+
+  /** GET /admin/roles
+   * Municipality Admin: নিজের Municipality-এর Roles
+   * Platform Admin: নির্বাচিত Municipality-এর Roles
+   */
+  getRoles(municipalityId?: number): Observable<any> {
+    let params = new HttpParams();
+
+    if (municipalityId !== undefined && municipalityId !== null) {
+      params = params.set('municipalityId', municipalityId.toString());
+    }
+
+    return this.http.get(`${this.base}/admin/roles`, { params });
+  }
+
+  /** Alias: নির্দিষ্ট Municipality-এর Roles */
+  getRolesByMunicipality(municipalityId: number): Observable<any> {
+    return this.getRoles(municipalityId);
   }
 
   /** POST /admin/roles */
-  createRole(payload: { code: string; nameBn: string; nameEn?: string; description?: string }): Observable<any> {
-    return this.http.post(`${this.base}/admin/roles`, payload);
+  createRole(payload: {
+    municipalityId?: number;
+    code: string;
+    nameBn: string;
+    nameEn?: string;
+    description?: string;
+  }): Observable<any> {
+    const body: any = {
+      roleCode: payload.code.trim(),
+      nameBn: payload.nameBn.trim(),
+      nameEn: payload.nameEn?.trim()
+    };
+
+    if (payload.municipalityId !== undefined &&
+        payload.municipalityId !== null) {
+      body.municipalityId = payload.municipalityId;
+    }
+
+    if (payload.description) {
+      body.description = payload.description.trim();
+    }
+
+    return this.http.post(`${this.base}/admin/roles`, body);
   }
 
   /** GET /admin/roles/{roleId}/permissions */
-  getRolePermissions(roleId: string): Observable<any> {
-    return this.http.get(`${this.base}/admin/roles/${roleId}/permissions`);
+  getRolePermissions(roleId: string | number): Observable<any> {
+    return this.http.get(
+      `${this.base}/admin/roles/${roleId}/permissions`
+    );
+  }
+
+  /** GET /platform/permissions */
+  getPermissions(): Observable<any> {
+    return this.http.get(`${this.base}/platform/permissions`);
   }
 
   /** POST /admin/roles/{roleId}/permissions */
-  setRolePermissions(roleId: string, permissions: string[]): Observable<any> {
-    return this.http.post(`${this.base}/admin/roles/${roleId}/permissions`, { permissions });
+  setRolePermissions(
+    roleId: string | number,
+    permissionCodes: string[]
+  ): Observable<any> {
+    return this.http.post(
+      `${this.base}/admin/roles/${roleId}/permissions`,
+      { permissionCodes }
+    );
   }
 
   /** POST /admin/roles/{roleId}/deactivate */
-  deactivateRole(roleId: string): Observable<any> {
-    return this.http.post(`${this.base}/admin/roles/${roleId}/deactivate`, {});
+  deactivateRole(roleId: string | number): Observable<any> {
+    return this.http.post(
+      `${this.base}/admin/roles/${roleId}/deactivate`,
+      {}
+    );
   }
 
   /** POST /admin/roles/assign */
-  assignRole(payload: { userId: string; roleId: string; municipalityId?: string }): Observable<any> {
-    return this.http.post(`${this.base}/admin/roles/assign`, payload);
+  assignRole(payload: {
+    userId: string;
+    roleId: string;
+    municipalityId?: string;
+  }): Observable<any> {
+    return this.http.post(
+      `${this.base}/admin/roles/assign`,
+      payload
+    );
   }
 
   /** GET /admin/roles/user/{userId} */
   getUserRoles(userId: string): Observable<any> {
-    return this.http.get(`${this.base}/admin/roles/user/${userId}`);
+    return this.http.get(
+      `${this.base}/admin/roles/user/${userId}`
+    );
   }
 
   // ─── Admin Users ────────────────────────────────────────
+
   /** POST /admin/users/{userId}/verify */
   verifyUser(userId: string): Observable<any> {
-    return this.http.post(`${this.base}/admin/users/${userId}/verify`, {});
+    return this.http.post(
+      `${this.base}/admin/users/${userId}/verify`,
+      {}
+    );
   }
 
   /** POST /admin/users/{userId}/suspend */
   suspendUser(userId: string): Observable<any> {
-    return this.http.post(`${this.base}/admin/users/${userId}/suspend`, {});
+    return this.http.post(
+      `${this.base}/admin/users/${userId}/suspend`,
+      {}
+    );
   }
 
   /** POST /admin/users/{userId}/inactive */
   inactiveUser(userId: string): Observable<any> {
-    return this.http.post(`${this.base}/admin/users/${userId}/inactive`, {});
+    return this.http.post(
+      `${this.base}/admin/users/${userId}/inactive`,
+      {}
+    );
   }
 
   // ─── Invites ────────────────────────────────────────────
+
   /** POST /admin/invites */
   sendInvite(payload: {
     mobile?: string;
@@ -70,18 +150,33 @@ export class AdminService {
     roleId?: string;
     nameBn?: string;
   }): Observable<any> {
-    return this.http.post(`${this.base}/admin/invites`, payload);
+    return this.http.post(
+      `${this.base}/admin/invites`,
+      payload
+    );
   }
 
   // ─── Users ──────────────────────────────────────────────
+
   /** GET /users/search?q= */
-  searchUsers(q: string): Observable<any> {
-    const params = new HttpParams().set('q', q);
-    return this.http.get(`${this.base}/users/search`, { params });
-  }
+ searchUsers(
+  q: string,
+  municipalityId: number
+): Observable<any> {
+  const params = new HttpParams()
+    .set('q', q)
+    .set('municipalityId', municipalityId.toString());
+
+  return this.http.get(
+    `${this.base}/users/search`,
+    { params }
+  );
+}
 
   /** GET /users/{id}/profile */
   getProfile(id: string): Observable<any> {
-    return this.http.get(`${this.base}/users/${id}/profile`);
+    return this.http.get(
+      `${this.base}/users/${id}/profile`
+    );
   }
 }

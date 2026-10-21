@@ -15,6 +15,28 @@ import { AdminService } from '../../../core/services/admin.service';
           {{ showCreate ? 'বন্ধ' : '+ নতুন রোল' }}
         </button>
       </div>
+      
+@if (municipalities().length > 0) {
+  <div class="card mb-2">
+    <div class="card-body">
+      <div class="form-group">
+        <label>Municipality নির্বাচন করুন</label>
+        <select
+          class="form-control"
+          [ngModel]="selectedMunicipalityId()"
+          (ngModelChange)="onMunicipalityChange($event)">
+          <option value="">-- Municipality বাছাই করুন --</option>
+          @for (m of municipalities(); track m.id) {
+            <option [value]="m.id">
+              {{ m.nameBn || m.nameEn || m.code }}
+            </option>
+          }
+        </select>
+      </div>
+    </div>
+  </div>
+}
+
 
       @if (errorMsg()) { <div class="alert alert-danger">{{ errorMsg() }}</div> }
       @if (successMsg()) { <div class="alert alert-success">{{ successMsg() }}</div> }
@@ -61,7 +83,7 @@ import { AdminService } from '../../../core/services/admin.service';
               <tbody>
                 @for (r of roles(); track r.id || r.roleId) {
                   <tr>
-                    <td><code>{{ r.code }}</code></td>
+                    <td><code>{{ r.roleCode || r.code }}</code></td>
                     <td>{{ r.nameBn || r.name_bn || r.name }}</td>
                     <td>{{ r.nameEn || r.name_en || '—' }}</td>
                     <td>
@@ -122,16 +144,44 @@ import { AdminService } from '../../../core/services/admin.service';
         <div class="card-header"><h3>রোল অ্যাসাইন</h3></div>
         <div class="card-body">
           <div class="form-row">
-            <div class="form-group">
-              <label>User ID</label>
-              <input class="form-control" [(ngModel)]="assignUserId" placeholder="user-uuid" />
-            </div>
+         <div class="form-group">
+  <label>User খুঁজুন (নাম / মোবাইল / ID)</label>
+
+  <input
+    class="form-control"
+    [ngModel]="userSearchText"
+    (ngModelChange)="onUserSearchChange($event)"
+    placeholder="কমপক্ষে ২টি অক্ষর লিখুন"
+  />
+
+  @if (userSearchLoading()) {
+    <small>ইউজার খোঁজা হচ্ছে...</small>
+  }
+
+  <select
+    class="form-control mt-2"
+    [ngModel]="assignUserId"
+    (ngModelChange)="onUserSelect($event)"
+  >
+    <option value="">-- User নির্বাচন করুন --</option>
+
+    @for (u of userResults(); track u.id || u.userId) {
+      <option [value]="u.id || u.userId">
+        {{ getUserLabel(u) }}
+      </option>
+    }
+  </select>
+
+ 
+</div>
             <div class="form-group">
               <label>Role</label>
               <select class="form-control" [(ngModel)]="assignRoleId">
                 <option value="">-- রোল বাছাই --</option>
                 @for (r of roles(); track r.id || r.roleId) {
-                  <option [value]="r.id || r.roleId">{{ r.nameBn || r.name }} ({{ r.code }})</option>
+                  <option [value]="r.id || r.roleId">
+  {{ r.nameBn || r.name }} ({{ r.roleCode || r.code }})
+</option>
                 }
               </select>
             </div>
@@ -166,6 +216,10 @@ import { AdminService } from '../../../core/services/admin.service';
 })
 export class RoleListComponent implements OnInit {
   roles = signal<any[]>([]);
+  
+municipalities = signal<any[]>([]);
+selectedMunicipalityId = signal<string>('');
+
   loading = signal(true);
   saving = signal(false);
   errorMsg = signal('');
@@ -181,84 +235,221 @@ export class RoleListComponent implements OnInit {
   selectedPerms = signal<string[]>([]);
   permLoading = signal(false);
 
-  assignUserId = '';
+    assignUserId = '';
   assignRoleId = '';
 
+  userSearchText = '';
+  userResults = signal<any[]>([]);
+  userSearchLoading = signal(false);
   constructor(private admin: AdminService) {}
 
-  ngOnInit() { this.load(); }
+  ngOnInit() {
+  this.loadMunicipalities();
+}
+
+loadMunicipalities() {
+  this.admin.getMunicipalities().subscribe({
+    next: (res: any) => {
+      const list = Array.isArray(res)
+        ? res
+        : res?.data || res?.content || [];
+
+      this.municipalities.set(list);
+
+      if (list.length > 0) {
+        // Platform Admin: প্রথম Municipality নির্বাচন
+        this.selectedMunicipalityId.set(String(list[0].id));
+        this.load();
+      } else {
+        this.load();
+      }
+    },
+    error: () => {
+      // Municipality list access না থাকলে নিজের Roles লোডের চেষ্টা
+      this.municipalities.set([]);
+      this.selectedMunicipalityId.set('');
+      this.load();
+    }
+  });
+}
+
+onMunicipalityChange(value: string) {
+  this.selectedMunicipalityId.set(value);
+  this.errorMsg.set('');
+  this.successMsg.set('');
+  this.assignUserId = '';
+this.assignRoleId = '';
+this.userSearchText = '';
+this.userResults.set([]);
+
+  if (!value) {
+    this.roles.set([]);
+    return;
+  }
+
+  this.load();
+}
+
 
   load() {
-    this.loading.set(true);
-    this.admin.getRoles().subscribe({
-      next: (res) => {
-        const list = Array.isArray(res) ? res : res?.data || res?.content || [];
-        this.roles.set(list);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        this.loading.set(false);
-        this.errorMsg.set(err?.error?.message || 'রোল লোড ব্যর্থ।');
-      },
-    });
+  this.loading.set(true);
+  this.errorMsg.set('');
+
+  const municipalityId = this.selectedMunicipalityId()
+    ? Number(this.selectedMunicipalityId())
+    : undefined;
+
+  this.admin.getRoles(municipalityId).subscribe({
+    next: (res: any) => {
+      const list = Array.isArray(res)
+        ? res
+        : res?.data || res?.content || [];
+
+      this.roles.set(list);
+      this.loading.set(false);
+    },
+    error: (err) => {
+      this.loading.set(false);
+      this.errorMsg.set(
+        err?.error?.message || 'রোল লোড ব্যর্থ।'
+      );
+    }
+  });
+}
+
+ 
+createRole() {
+  if (!this.newCode.trim() || !this.newNameBn.trim()) {
+    this.errorMsg.set('কোড ও নাম আবশ্যক।');
+    return;
   }
 
-  createRole() {
-    if (!this.newCode || !this.newNameBn) {
-      this.errorMsg.set('কোড ও নাম আবশ্যক।');
-      return;
-    }
-    this.saving.set(true);
-    this.errorMsg.set('');
-    this.admin.createRole({
-      code: this.newCode.trim(),
-      nameBn: this.newNameBn.trim(),
-      nameEn: this.newNameEn?.trim() || undefined,
-    }).subscribe({
-      next: () => {
-        this.saving.set(false);
-        this.successMsg.set('রোল তৈরি হয়েছে।');
-        this.showCreate = false;
-        this.newCode = ''; this.newNameBn = ''; this.newNameEn = '';
-        this.load();
-      },
-      error: (err) => {
-        this.saving.set(false);
-        this.errorMsg.set(err?.error?.message || 'তৈরি ব্যর্থ।');
-      },
-    });
+  const municipalityId = this.selectedMunicipalityId()
+    ? Number(this.selectedMunicipalityId())
+    : undefined;
+
+  if (
+    this.municipalities().length > 0 &&
+    (!municipalityId || municipalityId <= 0)
+  ) {
+    this.errorMsg.set('প্রথমে Municipality নির্বাচন করুন।');
+    return;
   }
+
+  this.saving.set(true);
+  this.errorMsg.set('');
+  this.successMsg.set('');
+
+  this.admin.createRole({
+    municipalityId,
+    code: this.newCode.trim(),
+    nameBn: this.newNameBn.trim(),
+    nameEn: this.newNameEn.trim() || undefined
+  }).subscribe({
+    next: () => {
+      this.saving.set(false);
+      this.successMsg.set('রোল তৈরি হয়েছে।');
+      this.showCreate = false;
+      this.newCode = '';
+      this.newNameBn = '';
+      this.newNameEn = '';
+      this.load();
+    },
+    error: (err) => {
+      this.saving.set(false);
+      this.errorMsg.set(
+        err?.error?.message || 'রোল তৈরি ব্যর্থ।'
+      );
+    }
+  });
+}
+
 
   viewPermissions(role: any) {
-    const id = role.id || role.roleId;
-    this.selectedRole.set(role);
-    this.permLoading.set(true);
-    this.admin.getRolePermissions(id).subscribe({
-      next: (res) => {
-        const list = Array.isArray(res) ? res : res?.data || res?.permissions || [];
-        this.permissions.set(list);
-        // pre-select already assigned
-        const assigned = list
-          .filter((p: any) => p.assigned === true || p.granted === true)
-          .map((p: any) => this.getPermId(p));
-        this.selectedPerms.set(assigned.length ? assigned : list.map((p: any) => this.getPermId(p)));
-        this.permLoading.set(false);
-      },
-      error: () => {
-        this.permissions.set([]);
-        this.permLoading.set(false);
-      },
-    });
-  }
+  const id = role.id || role.roleId;
+
+  this.selectedRole.set(role);
+  this.permLoading.set(true);
+  this.errorMsg.set('');
+
+  // First load the complete permission catalog
+  this.admin.getPermissions().subscribe({
+    next: (catalogRes: any) => {
+      const catalog = Array.isArray(catalogRes)
+        ? catalogRes
+        : catalogRes?.data || catalogRes?.permissions || [];
+
+      // Then load permissions already assigned to this role
+      this.admin.getRolePermissions(id).subscribe({
+        next: (assignedRes: any) => {
+          const assigned = Array.isArray(assignedRes)
+            ? assignedRes
+            : assignedRes?.data || assignedRes?.permissions || [];
+
+          // Backend returns permission codes, e.g. ["identity.user.view"]
+          const assignedCodes = assigned
+            .map((p: any) =>
+              typeof p === 'string'
+                ? p
+                : p.code || p.permissionCode || p.permission
+            )
+            .filter((code: any) => typeof code === 'string');
+
+          this.permissions.set(catalog);
+
+          // Select ONLY permissions already assigned to this role
+          this.selectedPerms.set(
+            catalog
+              .map((p: any) => p.code)
+              .filter(
+                (code: string) =>
+                  typeof code === 'string' &&
+                  assignedCodes.includes(code)
+              )
+          );
+
+          this.permLoading.set(false);
+        },
+        error: (err) => {
+          this.permissions.set([]);
+          this.selectedPerms.set([]);
+          this.permLoading.set(false);
+          this.errorMsg.set(
+            err?.error?.message ||
+            'এই রোলের আগের পারমিশন লোড করা যায়নি।'
+          );
+        }
+      });
+    },
+    error: (err) => {
+      this.permissions.set([]);
+      this.selectedPerms.set([]);
+      this.permLoading.set(false);
+      this.errorMsg.set(
+        err?.error?.message ||
+        'পারমিশনের তালিকা লোড করা যায়নি।'
+      );
+    }
+  });
+}
 
   getPermId(p: any): string {
     return p.id || p.code || p.permission || p.name || String(p);
   }
 
-  getPermLabel(p: any): string {
-    if (typeof p === 'string') return p;
-    return p.nameBn || p.name || p.code || p.permission || p.id;
+ getPermLabel(p: any): string {
+  if (typeof p === 'string') {
+    return p;
   }
+
+  return (
+    p.labelBn ||
+    p.labelEn ||
+    p.code ||
+    p.permissionCode ||
+    'Unknown permission'
+  );
+}
 
   togglePerm(id: string) {
     this.selectedPerms.update((list) =>
@@ -295,24 +486,111 @@ export class RoleListComponent implements OnInit {
       error: (err) => this.errorMsg.set(err?.error?.message || 'ব্যর্থ।'),
     });
   }
+ 
+onUserSearchChange(value: string) {
+  this.userSearchText = value;
+  this.assignUserId = '';
+  this.userResults.set([]);
+  this.errorMsg.set('');
+
+  const q = value.trim();
+
+  if (q.length < 2) {
+    this.userSearchLoading.set(false);
+    return;
+  }
+
+  const municipalityId = Number(this.selectedMunicipalityId());
+
+  if (!municipalityId) {
+    this.userSearchLoading.set(false);
+    this.errorMsg.set('প্রথমে Municipality নির্বাচন করুন।');
+    return;
+  }
+
+  this.userSearchLoading.set(true);
+
+  // নির্বাচিত Municipality ID-সহ User Search
+  this.admin.searchUsers(q, municipalityId).subscribe({
+    next: (res: any) => {
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.content)
+            ? res.content
+            : Array.isArray(res?.users)
+              ? res.users
+              : [];
+
+      this.userResults.set(list);
+      this.userSearchLoading.set(false);
+
+      if (list.length === 0) {
+        this.errorMsg.set('এই Municipality-তে কোনো User পাওয়া যায়নি।');
+      }
+    },
+    error: (err) => {
+      this.userResults.set([]);
+      this.userSearchLoading.set(false);
+      this.errorMsg.set(
+        err?.error?.message || 'User খোঁজা যায়নি।'
+      );
+    }
+  });
+}
+
+onUserSelect(userId: string) {
+  this.assignUserId = userId;
+}
+
+getUserLabel(user: any): string {
+  return (
+    user.nameBn ||
+    user.nameEn ||
+    user.fullName ||
+    user.name ||
+    'নাম নেই'
+  );
+}
 
   assign() {
-    this.saving.set(true);
-    this.errorMsg.set('');
-    this.admin.assignRole({
-      userId: this.assignUserId.trim(),
-      roleId: this.assignRoleId,
-    }).subscribe({
-      next: () => {
-        this.saving.set(false);
-        this.successMsg.set('রোল অ্যাসাইন হয়েছে।');
-        this.assignUserId = '';
-        this.assignRoleId = '';
-      },
-      error: (err) => {
-        this.saving.set(false);
-        this.errorMsg.set(err?.error?.message || 'অ্যাসাইন ব্যর্থ।');
-      },
-    });
+  const municipalityId = this.selectedMunicipalityId();
+
+  if (!municipalityId) {
+    this.errorMsg.set('প্রথমে Municipality নির্বাচন করুন।');
+    return;
   }
+
+  if (!this.assignUserId || !this.assignRoleId) {
+    this.errorMsg.set('User এবং Role নির্বাচন করুন।');
+    return;
+  }
+
+  this.saving.set(true);
+  this.errorMsg.set('');
+  this.successMsg.set('');
+
+  this.admin.assignRole({
+    userId: this.assignUserId,
+    roleId: this.assignRoleId,
+    municipalityId: municipalityId
+  }).subscribe({
+    next: () => {
+      this.saving.set(false);
+      this.successMsg.set('রোল অ্যাসাইন হয়েছে।');
+
+      this.assignUserId = '';
+      this.assignRoleId = '';
+      this.userSearchText = '';
+      this.userResults.set([]);
+    },
+    error: (err) => {
+      this.saving.set(false);
+      this.errorMsg.set(
+        err?.error?.message || 'রোল অ্যাসাইন ব্যর্থ।'
+      );
+    }
+  });
+}
 }

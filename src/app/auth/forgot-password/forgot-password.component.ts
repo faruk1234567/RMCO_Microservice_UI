@@ -6,9 +6,10 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 interface MunicipalityOption {
-  municipalityId: number;
+  municipalityId: number | null;
   nameBn?: string;
   nameEn?: string;
+  accountType?: string;
 }
 
 @Component({
@@ -54,18 +55,21 @@ interface MunicipalityOption {
 
           @if (municipalities.length > 0) {
             <div class="form-group">
-              <label>পৌরসভা নির্বাচন করুন</label>
+              <label>অ্যাকাউন্ট নির্বাচন করুন</label>
 
               <select
                 class="form-control"
                 [(ngModel)]="selectedMunicipalityId"
                 [disabled]="loading()"
               >
-                <option value="">-- পৌরসভা নির্বাচন করুন --</option>
+                <option value="">-- অ্যাকাউন্ট নির্বাচন করুন --</option>
 
-                @for (m of municipalities; track m.municipalityId) {
-                  <option [value]="m.municipalityId">
-                    {{ m.nameBn || m.nameEn || ('Municipality ' + m.municipalityId) }}
+                @for (m of municipalities; track $index) {
+                  <option [value]="m.municipalityId === null ? 'GLOBAL' : m.municipalityId">
+                    {{ m.nameBn || m.nameEn ||
+                      (m.municipalityId === null
+                        ? 'গ্লোবাল নাগরিক অ্যাকাউন্ট'
+                        : 'Municipality ' + m.municipalityId) }}
                   </option>
                 }
               </select>
@@ -79,7 +83,9 @@ interface MunicipalityOption {
             (click)="sendOtp()"
           >
             {{ loading() ? 'অপেক্ষা করুন...' :
-              (municipalities.length > 0 ? 'নির্বাচিত পৌরসভায় OTP পাঠান' : 'OTP পাঠান') }}
+              (municipalities.length > 0
+                ? 'নির্বাচিত অ্যাকাউন্টে OTP পাঠান'
+                : 'OTP পাঠান') }}
           </button>
         }
 
@@ -88,8 +94,10 @@ interface MunicipalityOption {
             <label>OTP কোড</label>
             <input
               class="form-control"
+              type="text"
               [(ngModel)]="otp"
               maxlength="6"
+              inputmode="numeric"
               autocomplete="one-time-code"
             />
           </div>
@@ -116,7 +124,8 @@ interface MunicipalityOption {
 
           <button
             class="btn btn-primary btn-block"
-            [disabled]="loading() || !otp || !newPassword || !confirmPassword"
+            [disabled]="loading() || !otp.trim() ||
+              !newPassword || !confirmPassword"
             (click)="reset()"
           >
             {{ loading() ? 'রিসেট হচ্ছে...' : 'পাসওয়ার্ড রিসেট করুন' }}
@@ -216,41 +225,69 @@ export class ForgotPasswordComponent {
     }
 
     if (this.municipalities.length > 0 && !this.selectedMunicipalityId) {
-      this.errorMsg.set('একটি পৌরসভা নির্বাচন করুন।');
+      this.errorMsg.set('একটি অ্যাকাউন্ট নির্বাচন করুন।');
       return;
     }
 
     this.loading.set(true);
 
-    const selectedId = this.selectedMunicipalityId
-      ? Number(this.selectedMunicipalityId)
-      : undefined;
+    // GLOBAL মানে নির্বাচিত অ্যাকাউন্টের municipalityId null।
+    const isGlobal = this.selectedMunicipalityId === 'GLOBAL';
 
-    this.auth.forgotSendOtp(this.mobile, selectedId?.toString()).subscribe({
+    const selectedId: number | null =
+      isGlobal
+        ? null
+        : this.selectedMunicipalityId
+          ? Number(this.selectedMunicipalityId)
+          : null;
+
+    this.auth.forgotSendOtp(
+      this.mobile,
+      selectedId === null ? undefined : String(selectedId)
+    ).subscribe({
       next: (res: any) => {
         this.loading.set(false);
 
         const data = res?.data ?? res;
 
         if (data?.requiresMunicipalitySelection) {
-          this.municipalities = data.municipalities ?? [];
+          this.municipalities = (data.municipalities ?? []).map(
+            (m: any) => ({
+              ...m,
+              municipalityId:
+                m.municipalityId === null ||
+                m.municipalityId === undefined
+                  ? null
+                  : Number(m.municipalityId),
+            })
+          );
+
           this.selectedMunicipalityId = '';
-          this.infoMsg.set('আপনার পৌরসভা নির্বাচন করে আবার OTP পাঠান।');
-          return;
-        }
-
-        const returnedId = data?.municipalityId ?? selectedId;
-
-        if (!returnedId) {
-          this.errorMsg.set(
-            'পৌরসভার তথ্য পাওয়া যায়নি। আবার চেষ্টা করুন।'
+          this.infoMsg.set(
+            'আপনার সঠিক অ্যাকাউন্ট নির্বাচন করে আবার OTP পাঠান।'
           );
           return;
         }
 
-        this.municipalityId = Number(returnedId);
-        this.selectedMunicipalityId = String(returnedId);
-        this.infoMsg.set('OTP পাঠানোর অনুরোধ সম্পন্ন হয়েছে।');
+        // Backend response-এ municipalityId না থাকলে
+        // নির্বাচিত account-এর context ব্যবহার করুন।
+        const responseId = data?.municipalityId;
+
+        if (responseId !== null && responseId !== undefined) {
+          this.municipalityId = Number(responseId);
+        } else if (isGlobal) {
+          this.municipalityId = null;
+        } else if (this.selectedMunicipalityId) {
+          this.municipalityId = selectedId;
+        } else {
+          // Global account-এর জন্য municipalityId null বৈধ।
+          // Backend-এ OTP send সফল হলে পরের ধাপে যেতে হবে।
+          this.municipalityId = null;
+        }
+
+        this.infoMsg.set(
+          'OTP পাঠানোর অনুরোধ সফল হয়েছে। মোবাইলে পাওয়া OTP লিখুন।'
+        );
         this.step.set(2);
       },
       error: (err: any) => {
@@ -266,12 +303,7 @@ export class ForgotPasswordComponent {
     this.errorMsg.set('');
     this.infoMsg.set('');
 
-    if (!this.municipalityId) {
-      this.errorMsg.set('পৌরসভার তথ্য পাওয়া যায়নি। আবার OTP নিন।');
-      this.step.set(1);
-      return;
-    }
-
+    // null municipalityId Global Citizen Account-এর জন্য বৈধ।
     if (this.newPassword !== this.confirmPassword) {
       this.errorMsg.set('দুটি পাসওয়ার্ড এক নয়।');
       return;
@@ -282,15 +314,18 @@ export class ForgotPasswordComponent {
       return;
     }
 
-    if (!this.otp.trim()) {
-      this.errorMsg.set('OTP কোড লিখুন।');
+    if (!/^\d{6}$/.test(this.otp.trim())) {
+      this.errorMsg.set('সঠিক ৬ সংখ্যার OTP কোড লিখুন।');
       return;
     }
 
     this.loading.set(true);
 
     this.auth.forgotReset({
-      municipalityId: String(this.municipalityId),
+      municipalityId:
+        this.municipalityId === null
+          ? undefined
+          : String(this.municipalityId),
       mobile: this.mobile,
       otp: this.otp.trim(),
       newPassword: this.newPassword,
