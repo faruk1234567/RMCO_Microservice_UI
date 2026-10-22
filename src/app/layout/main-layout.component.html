@@ -1,19 +1,19 @@
+
 <div class="app-shell">
   <header class="top-header">
-    <div class="header-left">
-      <div class="brand">
-        <div class="logo-mark">
-          <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
-            <circle cx="24" cy="24" r="24" fill="#0a5c36"/>
-            <path d="M24 12c-4.4 0-8 3.6-8 8 0 2.5 1.2 4.7 3 6.1V28h10v-1.9c1.8-1.4 3-3.6 3-6.1 0-4.4-3.6-8-8-8zm-3 18h6v2h-6v-2z" fill="#fff"/>
-          </svg>
-        </div>
-        <div class="brand-text">
-          <span class="brand-sub">DIGITAL BANGLADESH</span>
-          <span class="brand-name">Digital Municipality Services</span>
-        </div>
+    <a class="brand" routerLink="/dashboard" aria-label="Dashboard Home">
+      <div class="logo-mark">
+        <svg width="38" height="38" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="24" fill="#0a5c36"/>
+          <path d="M24 12c-4.4 0-8 3.6-8 8 0 2.5 1.2 4.7 3 6.1V28h10v-1.9c1.8-1.4 3-3.6 3-6.1 0-4.4-3.6-8-8-8zm-3 18h6v2h-6v-2z" fill="#fff"/>
+        </svg>
       </div>
-    </div>
+      <div class="brand-text">
+        <span class="brand-sub">DIGITAL BANGLADESH</span>
+        <span class="brand-name">Digital Municipality Services</span>
+      </div>
+    </a>
+
     <div class="header-right">
       <div class="user-info">
         <div class="avatar">{{ userName().charAt(0) }}</div>
@@ -22,26 +22,68 @@
           <span class="user-muni">{{ municipality() }}</span>
         </div>
       </div>
-      <div class="header-actions">
-        @if (isAdmin()) {
-          <button class="icon-btn" title="Admin Menu" (click)="toggleAdminMenu()">⚙</button>
-        }
-        <button class="icon-btn" title="Logout" (click)="logout()">⏻</button>
-      </div>
-      @if (showAdminMenu() && isAdmin()) {
-        <div class="admin-dropdown">
-          <div class="dropdown-title">Admin Menu</div>
-          @for (item of adminItems; track item.path) {
-            <a [routerLink]="item.path" class="dropdown-item" (click)="showAdminMenu.set(false)">{{ item.label }}</a>
+
+      <button
+        class="icon-btn"
+        type="button"
+        title="Logout"
+        aria-label="Logout"
+        (click)="logout()">
+        <span aria-hidden="true">⏻</span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="main-nav" aria-label="Main navigation">
+    @if (menuLoading()) {
+      <span class="nav-status">মেনু লোড হচ্ছে...</span>
+    } @else if (menuError()) {
+      <span class="nav-status error-text">
+        মেনু লোড করা যায়নি।
+        <button type="button" class="text-button" (click)="reloadMenus()">
+          আবার চেষ্টা করুন
+        </button>
+      </span>
+    } @else {
+      @for (item of menus(); track item.id) {
+        <div class="nav-item">
+          @if (item.children?.length) {
+            <button
+              type="button"
+              class="nav-link nav-parent"
+              [class.active]="isParentActive(item)"
+              (click)="toggleSubmenu(item.id)">
+              <span>{{ item.labelBn || item.labelEn }}</span>
+              <span class="chevron" aria-hidden="true">⌄</span>
+            </button>
+
+            @if (openSubmenuId() === item.id) {
+              <div class="submenu">
+                @for (child of item.children; track child.id) {
+                  <a
+                    class="submenu-link"
+                    [routerLink]="child.routePath"
+                    routerLinkActive="active"
+                    (click)="closeSubmenu()">
+                    {{ child.labelBn || child.labelEn }}
+                  </a>
+                }
+              </div>
+            }
+          } @else {
+            <a
+              class="nav-link"
+              [routerLink]="item.routePath"
+              routerLinkActive="active">
+              {{ item.labelBn || item.labelEn }}
+            </a>
           }
         </div>
       }
-    </div>
-  </header>
-  <nav class="main-nav">
-    @for (item of navItems(); track item.path) {
-      <a [routerLink]="item.path" routerLinkActive="active" class="nav-link">{{ item.label }}</a>
     }
   </nav>
-  <main class="main-content"><router-outlet /></main>
+
+  <main class="main-content">
+    <router-outlet />
+  </main>
 </div>
