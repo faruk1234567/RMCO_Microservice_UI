@@ -365,28 +365,40 @@ createRole() {
 }
 
 
-  viewPermissions(role: any) {
+  
+viewPermissions(role: any) {
   const id = role.id || role.roleId;
+
+  const municipalityId = this.selectedMunicipalityId()
+    ? Number(this.selectedMunicipalityId())
+    : undefined;
 
   this.selectedRole.set(role);
   this.permLoading.set(true);
   this.errorMsg.set('');
+  this.permissions.set([]);
+  this.selectedPerms.set([]);
 
-  // First load the complete permission catalog
+  // 1. সব Active Permission-এর catalog আনবে
   this.admin.getPermissions().subscribe({
     next: (catalogRes: any) => {
       const catalog = Array.isArray(catalogRes)
         ? catalogRes
-        : catalogRes?.data || catalogRes?.permissions || [];
+        : Array.isArray(catalogRes?.data)
+          ? catalogRes.data
+          : Array.isArray(catalogRes?.permissions)
+            ? catalogRes.permissions
+            : [];
 
-      // Then load permissions already assigned to this role
-      this.admin.getRolePermissions(id).subscribe({
+      // 2. এই Role-এ বর্তমানে যেসব Permission আছে সেগুলো আনবে
+      this.admin.getRolePermissions(id, municipalityId).subscribe({
         next: (assignedRes: any) => {
           const assigned = Array.isArray(assignedRes)
             ? assignedRes
-            : assignedRes?.data || assignedRes?.permissions || [];
+            : Array.isArray(assignedRes?.data)
+              ? assignedRes.data
+              : [];
 
-          // Backend returns permission codes, e.g. ["identity.user.view"]
           const assignedCodes = assigned
             .map((p: any) =>
               typeof p === 'string'
@@ -397,12 +409,11 @@ createRole() {
 
           this.permissions.set(catalog);
 
-          // Select ONLY permissions already assigned to this role
           this.selectedPerms.set(
             catalog
               .map((p: any) => p.code)
               .filter(
-                (code: string) =>
+                (code: any) =>
                   typeof code === 'string' &&
                   assignedCodes.includes(code)
               )
@@ -411,8 +422,6 @@ createRole() {
           this.permLoading.set(false);
         },
         error: (err) => {
-          this.permissions.set([]);
-          this.selectedPerms.set([]);
           this.permLoading.set(false);
           this.errorMsg.set(
             err?.error?.message ||
@@ -422,8 +431,6 @@ createRole() {
       });
     },
     error: (err) => {
-      this.permissions.set([]);
-      this.selectedPerms.set([]);
       this.permLoading.set(false);
       this.errorMsg.set(
         err?.error?.message ||
@@ -433,9 +440,15 @@ createRole() {
   });
 }
 
-  getPermId(p: any): string {
-    return p.id || p.code || p.permission || p.name || String(p);
-  }
+
+ getPermId(p: any): string {
+  return p.code
+    || p.permissionCode
+    || p.permission
+    || p.id
+    || p.name
+    || String(p);
+}
 
  getPermLabel(p: any): string {
   if (typeof p === 'string') {
@@ -462,7 +475,15 @@ createRole() {
     if (!role) return;
     const id = role.id || role.roleId;
     this.saving.set(true);
-    this.admin.setRolePermissions(id, this.selectedPerms()).subscribe({
+    const municipalityId = this.selectedMunicipalityId()
+  ? Number(this.selectedMunicipalityId())
+  : undefined;
+
+this.admin.setRolePermissions(
+  id,
+  this.selectedPerms(),
+  municipalityId
+).subscribe({
       next: () => {
         this.saving.set(false);
         this.successMsg.set('পারমিশন সংরক্ষিত।');

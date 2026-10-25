@@ -14,7 +14,7 @@ import { AuthService } from '../../core/services/auth.service';
 export class LoginComponent {
   loginId = '';
   password = '';
-  loginMode: 'default' | 'select' = 'default';
+  loginMode: 'default' | 'select' | 'platform' = 'default';
   selectedMunicipality = '';
   loading = signal(false);
   errorMsg = signal('');
@@ -59,10 +59,18 @@ export class LoginComponent {
     }
 
     // Normal login
-    this.auth.login({
-      loginId: this.loginId.trim(),
-      password: this.password,
-    }).subscribe({
+  // Login API নির্বাচন
+const loginRequest = {
+  loginId: this.loginId.trim(),
+  password: this.password,
+};
+
+const login$ =
+  this.loginMode === 'platform'
+    ? this.auth.platformLogin(loginRequest)
+    : this.auth.login(loginRequest);
+
+login$.subscribe({
       next: (res) => {
         this.loading.set(false);
 

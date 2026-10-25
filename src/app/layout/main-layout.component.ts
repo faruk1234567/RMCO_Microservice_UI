@@ -66,10 +66,20 @@ export class MainLayoutComponent implements OnInit {
     private router: Router
   ) {}
 
-  ngOnInit(): void {
-    this.loadMunicipalities();
-    this.loadMenuTree();
-  }
+ ngOnInit(): void {
+  console.log('Current User:', this.auth.currentUser());
+  console.log(
+    'Current Roles:',
+    this.auth.currentUser()?.roles
+  );
+  console.log(
+    'Is Platform Admin:',
+    this.auth.hasRole('PLATFORM_ADMIN')
+  );
+
+  this.loadMunicipalities();
+  this.loadMenuTree();
+}
 
   reloadMenus(): void {
     this.loadMenuTree();

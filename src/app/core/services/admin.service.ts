@@ -65,25 +65,73 @@ export class AdminService {
   }
 
   /** GET /admin/roles/{roleId}/permissions */
-  getRolePermissions(roleId: string | number): Observable<any> {
-    return this.http.get(
-      `${this.base}/admin/roles/${roleId}/permissions`
-    );
+  
+getRolePermissions(
+  roleId: string | number,
+  municipalityId?: number
+): Observable<any> {
+  let params = new HttpParams();
+
+  if (municipalityId != null) {
+    params = params.set('municipalityId', municipalityId.toString());
   }
+
+  return this.http.get(
+    `${this.base}/admin/roles/${roleId}/permissions`,
+    { params }
+  );
+}
+
 
   /** GET /platform/permissions */
   getPermissions(): Observable<any> {
     return this.http.get(`${this.base}/platform/permissions`);
   }
+  
+  /** POST /platform/permissions */
+  createPermission(payload: {
+    code: string;
+    permissionGroup: string;
+    labelBn: string;
+    labelEn: string;
+    isMenu?: boolean;
+    parentCode?: string | null;
+    sortOrder?: number;
+  }): Observable<any> {
+    return this.http.post(
+      `${this.base}/platform/permissions`,
+      {
+        code: payload.code.trim(),
+        permissionGroup: payload.permissionGroup.trim(),
+        labelBn: payload.labelBn.trim(),
+        labelEn: payload.labelEn.trim(),
+        isMenu: payload.isMenu ?? false,
+        parentCode: payload.parentCode || null,
+        sortOrder: payload.sortOrder ?? 0
+      }
+    );
+  }
+
 
   /** POST /admin/roles/{roleId}/permissions */
-  setRolePermissions(
+   setRolePermissions(
     roleId: string | number,
-    permissionCodes: string[]
+    permissionCodes: string[],
+    municipalityId?: number
   ): Observable<any> {
+    let params = new HttpParams();
+
+    if (municipalityId !== undefined && municipalityId !== null) {
+      params = params.set(
+        'selectedMunicipalityId',
+        municipalityId.toString()
+      );
+    }
+
     return this.http.post(
       `${this.base}/admin/roles/${roleId}/permissions`,
-      { permissionCodes }
+      { permissionCodes },
+      { params }
     );
   }
 

@@ -35,6 +35,14 @@
   </header>
 
   <nav class="main-nav" aria-label="Main navigation">
+    @if (auth.hasRole('PLATFORM_ADMIN')) {
+  <a
+    class="nav-link"
+    routerLink="/config/menus"
+    routerLinkActive="active">
+    Menu Management
+  </a>
+}
     @if (menuLoading()) {
       <span class="nav-status">মেনু লোড হচ্ছে...</span>
     } @else if (menuError()) {

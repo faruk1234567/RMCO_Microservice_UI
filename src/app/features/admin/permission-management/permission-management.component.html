@@ -1,0 +1,110 @@
+
+<div class="permission-page">
+  <div class="page-header">
+    <div>
+      <h2>Permission Management</h2>
+      <p>নতুন Permission Code তৈরি করুন</p>
+    </div>
+    <button type="button" (click)="loadPermissions()">Refresh</button>
+  </div>
+
+  <div class="alert success" *ngIf="successMessage">{{ successMessage }}</div>
+  <div class="alert error" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+  <section class="panel">
+    <h3>Create Permission</h3>
+
+    <form #permissionForm="ngForm" (ngSubmit)="savePermission()">
+      <div class="form-grid">
+        <div class="field">
+          <label>Permission Code *</label>
+          <input name="code" [(ngModel)]="form.code"
+                 placeholder="config.menu.view" required />
+        </div>
+
+        <div class="field">
+          <label>Permission Group *</label>
+          <input name="permissionGroup" [(ngModel)]="form.permissionGroup"
+                 placeholder="CONFIG" required />
+        </div>
+
+        <div class="field">
+          <label>বাংলা নাম *</label>
+          <input name="labelBn" [(ngModel)]="form.labelBn"
+                 placeholder="মেনু দেখা" required />
+        </div>
+
+        <div class="field">
+          <label>English Name *</label>
+          <input name="labelEn" [(ngModel)]="form.labelEn"
+                 placeholder="View Menu" required />
+        </div>
+
+        <div class="field">
+          <label>Parent Permission</label>
+          <select name="parentCode" [(ngModel)]="form.parentCode">
+            <option [ngValue]="null">None</option>
+            <option *ngFor="let p of permissions" [ngValue]="p.code">
+              {{ p.code }}
+            </option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Sort Order</label>
+          <input name="sortOrder" type="number"
+                 [(ngModel)]="form.sortOrder" />
+        </div>
+      </div>
+
+      <div class="checkbox-row">
+        <input id="isMenu" name="isMenu" type="checkbox"
+               [(ngModel)]="form.isMenu" />
+        <label for="isMenu">এটি Menu Permission</label>
+      </div>
+
+      <div class="actions">
+        <button type="submit" [disabled]="saving || !permissionForm.valid">
+          {{ saving ? 'Saving...' : 'Create Permission' }}
+        </button>
+        <button type="button" (click)="resetForm()">Clear</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h3>Existing Permissions ({{ permissions.length }})</h3>
+
+    <p *ngIf="loading">Loading...</p>
+
+    <div class="table-wrapper" *ngIf="!loading">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Group</th>
+            <th>বাংলা নাম</th>
+            <th>English Name</th>
+            <th>Menu</th>
+            <th>Parent</th>
+            <th>Order</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of permissions">
+            <td>{{ p.code }}</td>
+            <td>{{ p.permissionGroup }}</td>
+            <td>{{ p.labelBn }}</td>
+            <td>{{ p.labelEn }}</td>
+            <td>{{ p.isMenu ? 'Yes' : 'No' }}</td>
+            <td>{{ p.parentCode || '-' }}</td>
+            <td>{{ p.sortOrder }}</td>
+          </tr>
+          <tr *ngIf="permissions.length === 0">
+            <td colspan="7">কোনো Permission পাওয়া যায়নি।</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

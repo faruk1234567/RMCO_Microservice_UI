@@ -83,84 +83,131 @@ export class AuthService {
         payload
       )
       .pipe(
-        tap((res) => this.handleLoginResponse(res)),
+       tap((res) => {
+  const data = res?.data ?? res;
+
+  console.log('FULL PLATFORM LOGIN RESPONSE:', res);
+  console.log('RESPONSE DATA:', data);
+  console.log('ROLES:', data?.roles);
+  console.log('ROLE NAMES:', data?.roleNames);
+
+  this.handleLoginResponse(res);
+
+  console.log('SAVED USER:', this.currentUserSignal());
+  console.log(
+    'IS PLATFORM ADMIN:',
+    this.hasRole('PLATFORM_ADMIN')
+  );
+}),
         catchError((err) => throwError(() => err))
       );
   }
 
   /** POST /platform/auth/login */
-  platformLogin(req: {
-    loginId: string;
-    password: string;
-    deviceLabel?: string;
-  }): Observable<any> {
-    const body = {
-      identifier: req.loginId,
-      password: req.password,
-      deviceLabel: req.deviceLabel || 'web',
-    };
 
-    return this.http
-      .post<any>(`${this.base}/platform/auth/login`, body)
-      .pipe(
-        tap((res) => this.handleLoginResponse(res)),
-        catchError((err) => throwError(() => err))
-      );
-  }
+platformLogin(req: {
+  loginId: string;
+  password: string;
+  deviceLabel?: string;
+}): Observable<any> {
+  const body = {
+    identifier: req.loginId,
+    password: req.password,
+    deviceLabel: req.deviceLabel || 'web',
+  };
 
-  private handleLoginResponse(res: any): void {
-    const data = res?.data ?? res;
+  console.log('PLATFORM LOGIN URL:', `${this.base}/platform/auth/login`);
 
-    const token =
-      data?.accessToken ||
-      data?.access_token ||
-      data?.token ||
-      res?.accessToken ||
-      res?.token;
+  return this.http
+    .post<any>(`${this.base}/platform/auth/login`, body)
+    .pipe(
+     tap((res) => {
+  console.log('PLATFORM LOGIN FULL RESPONSE:', res);
 
-    if (token) {
-      localStorage.setItem(TOKEN_KEY, token);
-      this.tokenSignal.set(token);
-    }
+  const data = res?.data ?? res;
 
-    const id = data?.userId || data?.user_id || data?.id;
+  console.log('PLATFORM LOGIN DATA:', data);
+  console.log('RAW RESPONSE:', JSON.stringify(res, null, 2));
+  console.log('DATA ROLES:', data?.roles);
+  console.log('DATA KEYS:', Object.keys(data ?? {}));
 
-    const rolesRaw = data?.roles || data?.roleNames || [];
+  this.handleLoginResponse(res);
 
-    const roleList: string[] = Array.isArray(rolesRaw)
-      ? rolesRaw.map((role: any) =>
-          typeof role === 'string'
-            ? role
-            : role?.code || role?.name || String(role)
-        )
+  console.log(
+    'USER AFTER HANDLE:',
+    this.currentUserSignal()
+  );
+
+  console.log(
+    'SAVED ROLES:',
+    this.currentUserSignal()?.roles
+  );
+}),
+      catchError((err) => {
+        console.error('PLATFORM LOGIN ERROR:', err);
+        return throwError(() => err);
+      })
+    );
+}
+
+ 
+private handleLoginResponse(res: any): void {
+  console.log('FULL RES JSON:', JSON.stringify(res, null, 2));
+console.log('RES TYPE:', typeof res);
+console.log('RES KEYS:', Object.keys(res ?? {}));
+  const data = res?.data ?? res;
+
+  const token =
+    data?.accessToken ??
+    data?.access_token ??
+    data?.token ??
+    res?.accessToken ??
+    res?.access_token ??
+    res?.token;
+
+  const id = data?.userId ?? data?.user_id ?? data?.id;
+
+  const rolesRaw = data?.roles ?? data?.roleNames ?? [];
+
+  const roles: string[] = Array.isArray(rolesRaw)
+    ? rolesRaw.map((role: any) =>
+        typeof role === 'string'
+          ? role
+          : role?.code ?? role?.name ?? String(role)
+      )
+    : typeof rolesRaw === 'string'
+      ? [rolesRaw]
       : [];
 
-    // Keep existing fallback behavior unchanged.
-    if (
-      !roleList.length &&
-      (data?.municipalityId == null || data?.municipalityId === null)
-    ) {
-      roleList.push('PLATFORM_ADMIN');
-    }
-
-    if (token || id) {
-      const mapped: AppUser = {
-        id: id || 'platform-user',
-        municipalityId: data?.municipalityId ?? null,
-        mobileNormalized: data?.mobile || '',
-        emailNormalized: data?.email || '',
-        nameBn: data?.nameBn || 'Admin',
-        nameEn: data?.nameEn || 'Admin',
-        status: data?.status || 'ACTIVE',
-        roles: roleList.length ? roleList : ['PLATFORM_ADMIN'],
-        formLanguage: 'BN',
-      };
-
-      localStorage.setItem(USER_KEY, JSON.stringify(mapped));
-      this.currentUserSignal.set(mapped);
-    }
+  if (!token || !id) {
+    console.error('Login response missing token or user ID:', {
+      hasToken: !!token,
+      hasUserId: !!id,
+      roles
+    });
+    return;
   }
 
+  const mapped: AppUser = {
+    id: String(id),
+    municipalityId: data?.municipalityId ?? null,
+    mobileNormalized: data?.mobile ?? '',
+    emailNormalized: data?.email ?? '',
+    nameBn: data?.nameBn ?? 'Admin',
+    nameEn: data?.nameEn ?? 'Admin',
+    status: data?.status ?? 'ACTIVE',
+    roles,
+    formLanguage: 'BN',
+  };
+
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(mapped));
+
+  this.tokenSignal.set(token);
+  this.currentUserSignal.set(mapped);
+
+  console.log('Saved login roles:', mapped.roles);
+}
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -327,8 +374,12 @@ export class AuthService {
 }
 
   hasRole(role: string): boolean {
-    return !!this.currentUserSignal()?.roles?.includes(role);
-  }
+  const roles = this.currentUserSignal()?.roles ?? [];
+
+  return roles.some(
+    (item) => item?.trim().toUpperCase() === role.trim().toUpperCase()
+  );
+}
 
   hasAnyRole(...roles: string[]): boolean {
     const userRoles = this.currentUserSignal()?.roles || [];
