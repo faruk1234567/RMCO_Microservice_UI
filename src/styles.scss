@@ -1,9 +1,22 @@
 /* Digital Municipality Services - Global Theme (Angular 18) */
 :root {
-  --primary: #0a5c36;
-  --primary-dark: #064028;
-  --primary-light: #0d7a48;
-  --primary-hover: #0b6b3f;
+  /* ====== Brand (BizRunner-style slate gray) ====== */
+  --primary: #7f8c8d;          /* উপরের নেভিগেশন bar */
+  --primary-dark: #0a5c36;     /* heading ও brand-name: গাঢ় সবুজ */
+  --accent: #1a4fa0;           /* active underline ও লিংক: নীল */
+
+  /* ====== Surfaces ====== */
+  --bg-body: #ffffff;
+  --border: #e1e5e7;
+
+  /* ====== Text ====== */
+  --text-primary: #2f3b3c;
+  --text-secondary: #5d6869;
+  --text-muted: #8a9596;
+
+  /* ====== Shape ====== */
+  --radius-md: 6px;
+  --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.12);
   --accent: #f0b429;
   --bg-body: #f0f4f2;
   --bg-card: #ffffff;

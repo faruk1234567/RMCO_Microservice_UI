@@ -1,5 +1,5 @@
 
-import { Component, computed, signal, OnInit } from '@angular/core';
+import { Component, computed, signal, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   Router,
@@ -12,6 +12,7 @@ import { finalize } from 'rxjs';
 import { AuthService } from '../core/services/auth.service';
 import { MenuService, MenuItem } from '../core/services/menu.service';
 import { Municipality } from '../core/models/user.model';
+
 
 @Component({
   selector: 'app-main-layout',
@@ -26,6 +27,36 @@ import { Municipality } from '../core/models/user.model';
   styleUrl: './main-layout.component.scss',
 })
 export class MainLayoutComponent implements OnInit {
+readonly MAX_VISIBLE = 6;
+readonly MORE_ID = -1;
+
+// admin route চেনার জন্য
+private isAdminPath(path?: string | null): boolean {
+  return !!path && /^\/?(admin|config\/menus)(\/|$)/.test(path);
+}
+
+// user header-এর জন্য পরিষ্কার menu (admin item বাদ)
+private cleanMenus = computed(() =>
+  this.menus()
+    .map(m => ({
+      ...m,
+      children: (m.children ?? []).filter(c => !this.isAdminPath(c.routePath)),
+    }))
+    .filter(m => !this.isAdminPath(m.routePath))
+    // child নেই আর নিজের route-ও নেই, এমন খালি parent লুকাবে
+    .filter(m => m.children.length > 0 || !!m.routePath)
+);
+
+visibleMenus  = computed(() => this.cleanMenus().slice(0, this.MAX_VISIBLE));
+overflowMenus = computed(() => this.cleanMenus().slice(this.MAX_VISIBLE));
+
+
+@HostListener('document:click', ['$event'])
+onDocClick(e: MouseEvent) {
+  if (!(e.target as HTMLElement).closest('.nav-item')) {
+    this.closeSubmenu();
+  }
+}
   municipalities = signal<Municipality[]>([]);
   municipalityLoading = signal(false);
 
