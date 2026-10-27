@@ -1,3 +1,4 @@
+
 <div class="app-shell">
   <header class="top-header">
     <a class="brand" routerLink="/dashboard" aria-label="Dashboard Home">
@@ -26,7 +27,13 @@
         </div>
       </div>
 
-      <button class="icon-btn" type="button" title="Logout" aria-label="Logout" (click)="logout()">
+      <button
+        class="icon-btn"
+        type="button"
+        title="Logout"
+        aria-label="Logout"
+        (click)="logout()"
+      >
         <span aria-hidden="true">⏻</span>
       </button>
     </div>
@@ -38,15 +45,24 @@
     } @else if (menuError()) {
       <span class="nav-status error-text">
         মেনু লোড করা যায়নি।
-        <button type="button" class="text-button" (click)="reloadMenus()">আবার চেষ্টা করুন</button>
+        <button
+          type="button"
+          class="text-button"
+          (click)="reloadMenus()"
+        >
+          আবার চেষ্টা করুন
+        </button>
       </span>
     } @else {
       @for (item of visibleMenus(); track item.id) {
         <div class="nav-item">
           @if (item.children?.length) {
-            <button type="button" class="nav-link nav-parent"
-                    [class.active]="isParentActive(item)"
-                    (click)="toggleSubmenu(item.id)">
+            <button
+              type="button"
+              class="nav-link nav-parent"
+              [class.active]="isParentActive(item)"
+              (click)="toggleSubmenu(item.id)"
+            >
               <span>{{ item.labelBn || item.labelEn }}</span>
               <span class="chevron" aria-hidden="true">⌄</span>
             </button>
@@ -54,15 +70,23 @@
             @if (openSubmenuId() === item.id) {
               <div class="submenu">
                 @for (child of item.children; track child.id) {
-                  <a class="submenu-link" [routerLink]="child.routePath"
-                     routerLinkActive="active" (click)="closeSubmenu()">
+                  <a
+                    class="submenu-link"
+                    [routerLink]="getMenuRoute(child)"
+                    routerLinkActive="active"
+                    (click)="closeSubmenu()"
+                  >
                     {{ child.labelBn || child.labelEn }}
                   </a>
                 }
               </div>
             }
           } @else {
-            <a class="nav-link" [routerLink]="item.routePath" routerLinkActive="active">
+            <a
+              class="nav-link"
+              [routerLink]="getMenuRoute(item)"
+              routerLinkActive="active"
+            >
               {{ item.labelBn || item.labelEn }}
             </a>
           }
@@ -71,24 +95,40 @@
 
       @if (overflowMenus().length) {
         <div class="nav-item">
-          <button type="button" class="nav-link nav-parent" (click)="toggleSubmenu(MORE_ID)">
-            <span>আরও</span><span class="chevron" aria-hidden="true">⌄</span>
+          <button
+            type="button"
+            class="nav-link nav-parent"
+            (click)="toggleSubmenu(MORE_ID)"
+          >
+            <span>আরও</span>
+            <span class="chevron" aria-hidden="true">⌄</span>
           </button>
 
           @if (openSubmenuId() === MORE_ID) {
             <div class="submenu submenu-right">
               @for (item of overflowMenus(); track item.id) {
                 @if (item.children?.length) {
-                  <div class="submenu-heading">{{ item.labelBn || item.labelEn }}</div>
+                  <div class="submenu-heading">
+                    {{ item.labelBn || item.labelEn }}
+                  </div>
+
                   @for (child of item.children; track child.id) {
-                    <a class="submenu-link" [routerLink]="child.routePath"
-                       routerLinkActive="active" (click)="closeSubmenu()">
+                    <a
+                      class="submenu-link"
+                      [routerLink]="getMenuRoute(child)"
+                      routerLinkActive="active"
+                      (click)="closeSubmenu()"
+                    >
                       {{ child.labelBn || child.labelEn }}
                     </a>
                   }
                 } @else {
-                  <a class="submenu-link" [routerLink]="item.routePath"
-                     routerLinkActive="active" (click)="closeSubmenu()">
+                  <a
+                    class="submenu-link"
+                    [routerLink]="getMenuRoute(item)"
+                    routerLinkActive="active"
+                    (click)="closeSubmenu()"
+                  >
                     {{ item.labelBn || item.labelEn }}
                   </a>
                 }

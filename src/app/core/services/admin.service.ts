@@ -227,4 +227,82 @@ getRolePermissions(
       `${this.base}/users/${id}/profile`
     );
   }
+ 
+  /** GET /users/search
+   *
+   * Municipality user:
+   *   municipalityId না পাঠালে backend login context ব্যবহার করবে।
+   *
+   * Platform Admin:
+   *   নির্বাচিত municipalityId পাঠাতে হবে।
+   */
+  searchCitizens(filters: {
+    mobile?: string;
+    name?: string;
+    verificationStatus?: string;
+    municipalityId?: number | null;
+  }): Observable<any> {
+    let params = new HttpParams();
+
+    const mobile = filters.mobile?.trim();
+    const name = filters.name?.trim();
+    const verificationStatus = filters.verificationStatus?.trim();
+
+    if (mobile) {
+      params = params.set('mobile', mobile);
+    }
+
+    if (name) {
+      params = params.set('name', name);
+    }
+
+    if (verificationStatus) {
+      params = params.set(
+        'verificationStatus',
+        verificationStatus
+      );
+    }
+
+    if (filters.municipalityId != null) {
+      params = params.set(
+        'municipalityId',
+        filters.municipalityId.toString()
+      );
+    }
+
+    return this.http.get(`${this.base}/users/search`, { params });
+  }
+  /** GET Municipality Permission Matrix */
+getMunicipalityPermissionMatrix(
+  municipalityId: number
+): Observable<any> {
+  return this.http.get(
+    `${this.base}/admin/roles/municipalities/${municipalityId}/permission-matrix`
+  );
+}
+
+/** PUT /admin/roles/municipalities/{municipalityId}/permissions */
+updateMunicipalityPermission(
+  municipalityId: number,
+  payload: {
+    permissionCode: string;
+    canUse: boolean;
+    canDelegate: boolean;
+  }
+): Observable<any> {
+  return this.http.put(
+    `${this.base}/admin/roles/municipalities/${municipalityId}/permissions`,
+    payload
+  );
+}
+
+createCitizen(payload: any): Observable<any> {
+  return this.http.post(
+    `${this.base}/users/citizens`,
+    payload
+  );
+}
+
+
+
 }

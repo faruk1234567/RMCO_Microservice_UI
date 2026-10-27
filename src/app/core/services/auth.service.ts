@@ -398,4 +398,7 @@ console.log('RES KEYS:', Object.keys(res ?? {}));
       this.hasPermission(permission)
     );
   }
+  createCitizen(payload: any): Observable<any> {
+  return this.http.post(`${this.base}/users/citizens`, payload);
+}
 }

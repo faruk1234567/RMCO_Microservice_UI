@@ -40,6 +40,100 @@ import { AdminService } from '../../../core/services/admin.service';
 
       @if (errorMsg()) { <div class="alert alert-danger">{{ errorMsg() }}</div> }
       @if (successMsg()) { <div class="alert alert-success">{{ successMsg() }}</div> }
+      
+<!-- Municipality Permission Policy Configuration -->
+<div class="card mb-2">
+  <div class="card-header">
+    <h3>Municipality Permission Policy</h3>
+    <p class="text-muted">
+      কোন Permission ব্যবহার ও অন্য Role-কে দেওয়া যাবে তা নির্ধারণ করুন।
+    </p>
+  </div>
+
+  <div class="card-body">
+    @if (!selectedMunicipalityId()) {
+      <p class="text-muted">প্রথমে Municipality নির্বাচন করুন।</p>
+    } @else if (policyLoading()) {
+      <div class="spinner"></div>
+    } @else {
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Permission</th>
+              <th>ব্যবহার করা যাবে</th>
+              <th>অন্য Role-কে দেওয়া যাবে</th>
+              <th>অ্যাকশন</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (
+              p of municipalityPermissionMatrix();
+              track p.permissionCode || p.code
+            ) {
+              <tr>
+                <td>
+                  <strong>{{ p.labelBn || p.permissionCode || p.code }}</strong>
+                  <br />
+                  <small class="text-muted">
+                    {{ p.permissionCode || p.code }}
+                  </small>
+                </td>
+
+                <td>
+                  <input
+                    type="checkbox"
+                    [checked]="p.canUse === true"
+                    (change)="updatePolicyValue(
+                      p.permissionCode || p.code,
+                      'canUse',
+                      $any($event.target).checked
+                    )"
+                  />
+                </td>
+
+                <td>
+                  <input
+                    type="checkbox"
+                    [checked]="p.canDelegate === true"
+                    [disabled]="p.canUse !== true"
+                    (change)="updatePolicyValue(
+                      p.permissionCode || p.code,
+                      'canDelegate',
+                      $any($event.target).checked
+                    )"
+                  />
+                </td>
+
+                <td>
+                  <button
+                    class="btn btn-sm btn-primary"
+                    [disabled]="policySaving()"
+                    (click)="saveMunicipalityPolicy(p)"
+                  >
+                    {{
+                      policySavingCode() === (p.permissionCode || p.code)
+                        ? 'সংরক্ষণ...'
+                        : 'Save'
+                    }}
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="4" class="text-center text-muted">
+                  Permission Policy পাওয়া যায়নি।
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</div>
+
 
       @if (showCreate) {
         <div class="card mb-2">
@@ -120,13 +214,31 @@ import { AdminService } from '../../../core/services/admin.service';
               @if (permLoading()) { <div class="spinner"></div> }
               @if (!permLoading()) {
                 <div class="perm-list">
-                  @for (p of permissions(); track p) {
-                    <label class="check-label">
-                      <input type="checkbox" [checked]="selectedPerms().includes(getPermId(p))"
-                        (change)="togglePerm(getPermId(p))" />
-                      {{ getPermLabel(p) }}
-                    </label>
-                  } @empty {
+                 @for (p of permissions(); track getPermId(p)) {
+  <label
+    class="check-label"
+    [class.permission-disabled]="
+      !isPermissionAllowed(getPermId(p))
+    "
+  >
+    <input
+      type="checkbox"
+      [checked]="selectedPerms().includes(getPermId(p))"
+      [disabled]="!isPermissionAllowed(getPermId(p))"
+      (change)="togglePerm(getPermId(p))"
+    />
+
+    <span>
+      {{ getPermLabel(p) }}
+
+      @if (!isPermissionAllowed(getPermId(p))) {
+        <small class="text-muted">
+          (Municipality-তে অনুমোদিত নয়)
+        </small>
+      }
+    </span>
+  </label>
+} @empty {
                     <p class="text-muted">কোনো পারমিশন পাওয়া যায়নি। Backend response চেক করুন।</p>
                   }
                 </div>
@@ -203,6 +315,14 @@ import { AdminService } from '../../../core/services/admin.service';
       background:#fff; border-radius:12px; width:100%; max-width:480px;
       max-height:80vh; overflow:auto; box-shadow:0 12px 40px rgba(0,0,0,0.25);
     }
+    .permission-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.permission-disabled input {
+  cursor: not-allowed;
+}
     .modal-header {
       display:flex; justify-content:space-between; align-items:center;
       padding:16px 20px; border-bottom:1px solid #e8eee9;
@@ -216,6 +336,12 @@ import { AdminService } from '../../../core/services/admin.service';
 })
 export class RoleListComponent implements OnInit {
   roles = signal<any[]>([]);
+  municipalityPermissionMatrix = signal<any[]>([]);
+  
+policyLoading = signal(false);
+policySavingCode = signal('');
+policySaving = signal(false);
+
   
 municipalities = signal<any[]>([]);
 selectedMunicipalityId = signal<string>('');
@@ -283,11 +409,12 @@ this.userSearchText = '';
 this.userResults.set([]);
 
   if (!value) {
-    this.roles.set([]);
-    return;
-  }
-
+  this.roles.set([]);
+  this.municipalityPermissionMatrix.set([]);
+  return;
+}
   this.load();
+  this.loadMunicipalityPolicies();
 }
 
 
@@ -373,13 +500,19 @@ viewPermissions(role: any) {
     ? Number(this.selectedMunicipalityId())
     : undefined;
 
+  if (!municipalityId) {
+    this.errorMsg.set('প্রথমে Municipality নির্বাচন করুন।');
+    return;
+  }
+
   this.selectedRole.set(role);
   this.permLoading.set(true);
   this.errorMsg.set('');
   this.permissions.set([]);
   this.selectedPerms.set([]);
+  this.municipalityPermissionMatrix.set([]);
 
-  // 1. সব Active Permission-এর catalog আনবে
+  // 1. Global Permission Catalog লোড
   this.admin.getPermissions().subscribe({
     next: (catalogRes: any) => {
       const catalog = Array.isArray(catalogRes)
@@ -390,66 +523,104 @@ viewPermissions(role: any) {
             ? catalogRes.permissions
             : [];
 
-      // 2. এই Role-এ বর্তমানে যেসব Permission আছে সেগুলো আনবে
-      this.admin.getRolePermissions(id, municipalityId).subscribe({
-        next: (assignedRes: any) => {
-          const assigned = Array.isArray(assignedRes)
-            ? assignedRes
-            : Array.isArray(assignedRes?.data)
-              ? assignedRes.data
-              : [];
+      // 2. Municipality Permission Matrix লোড
+      this.admin
+        .getMunicipalityPermissionMatrix(municipalityId)
+        .subscribe({
+          next: (matrixRes: any) => {
+            const matrix = Array.isArray(matrixRes)
+              ? matrixRes
+              : Array.isArray(matrixRes?.data)
+                ? matrixRes.data
+                : [];
 
-          const assignedCodes = assigned
-            .map((p: any) =>
-              typeof p === 'string'
-                ? p
-                : p.code || p.permissionCode || p.permission
-            )
-            .filter((code: any) => typeof code === 'string');
+            this.municipalityPermissionMatrix.set(matrix);
 
-          this.permissions.set(catalog);
+            // Console-এ policy value দেখাবে
+            console.table(
+              matrix.map((p: any) => ({
+                permissionCode: p.permissionCode || p.code,
+                canUse: p.canUse,
+                canDelegate: p.canDelegate
+              }))
+            );
 
-          this.selectedPerms.set(
-            catalog
-              .map((p: any) => p.code)
-              .filter(
-                (code: any) =>
-                  typeof code === 'string' &&
-                  assignedCodes.includes(code)
-              )
-          );
+            // 3. Role-এর assigned permissions লোড
+            this.admin
+              .getRolePermissions(id, municipalityId)
+              .subscribe({
+                next: (assignedRes: any) => {
+                  const assigned = Array.isArray(assignedRes)
+                    ? assignedRes
+                    : Array.isArray(assignedRes?.data)
+                      ? assignedRes.data
+                      : [];
 
-          this.permLoading.set(false);
-        },
-        error: (err) => {
-          this.permLoading.set(false);
-          this.errorMsg.set(
-            err?.error?.message ||
-            'এই রোলের আগের পারমিশন লোড করা যায়নি।'
-          );
-        }
-      });
+                  const assignedCodes = assigned
+                    .map((p: any) =>
+                      typeof p === 'string'
+                        ? p
+                        : p.permissionCode || p.code || p.permission
+                    )
+                    .filter(
+                      (code: any) => typeof code === 'string'
+                    );
+
+                  this.permissions.set(catalog);
+
+                  this.selectedPerms.set(
+                    catalog
+                      .map((p: any) => this.getPermId(p))
+                      .filter(
+                        (code: string) => assignedCodes.includes(code)
+                      )
+                  );
+
+                  this.permLoading.set(false);
+                },
+                error: (err) => {
+                  this.permLoading.set(false);
+                  this.errorMsg.set(
+                    err?.error?.message ||
+                    'Role-এর Permission লোড করা যায়নি।'
+                  );
+                }
+              });
+          },
+          error: (err) => {
+            this.permLoading.set(false);
+            this.errorMsg.set(
+              err?.error?.message ||
+              'Municipality Permission Matrix লোড করা যায়নি।'
+            );
+          }
+        });
     },
     error: (err) => {
       this.permLoading.set(false);
       this.errorMsg.set(
         err?.error?.message ||
-        'পারমিশনের তালিকা লোড করা যায়নি।'
+        'Permission Catalog লোড করা যায়নি।'
       );
     }
   });
 }
 
 
- getPermId(p: any): string {
-  return p.code
-    || p.permissionCode
-    || p.permission
-    || p.id
-    || p.name
-    || String(p);
-}
+getPermId(p: any): string {
+  if (typeof p === 'string') {
+    return p;
+  }
 
+  return (
+    p.permissionCode ||
+    p.code ||
+    p.permission ||
+    p.id ||
+    p.name ||
+    ''
+  );
+}
  getPermLabel(p: any): string {
   if (typeof p === 'string') {
     return p;
@@ -613,5 +784,123 @@ getUserLabel(user: any): string {
       );
     }
   });
+  
 }
+isPermissionAllowed(permissionCode: string): boolean {
+  const matrix = this.municipalityPermissionMatrix();
+
+  const policy = matrix.find((p: any) =>
+    (p.permissionCode || p.code) === permissionCode
+  );
+
+  return (
+    policy != null &&
+    policy.canUse === true &&
+    policy.canDelegate === true
+  );
+}
+
+loadMunicipalityPolicies() {
+  const municipalityId = Number(this.selectedMunicipalityId());
+
+  if (!municipalityId) {
+    this.municipalityPermissionMatrix.set([]);
+    return;
+  }
+
+  this.policyLoading.set(true);
+
+  this.admin.getMunicipalityPermissionMatrix(municipalityId).subscribe({
+    next: (res: any) => {
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data)
+          ? res.data
+          : [];
+
+      this.municipalityPermissionMatrix.set(list);
+      this.policyLoading.set(false);
+    },
+    error: (err) => {
+      this.policyLoading.set(false);
+      this.errorMsg.set(
+        err?.error?.message || 'Permission Policy লোড করা যায়নি।'
+      );
+    }
+  });
+}
+
+updatePolicyValue(
+  permissionCode: string,
+  field: 'canUse' | 'canDelegate',
+  value: boolean
+) {
+  this.municipalityPermissionMatrix.update(list =>
+    list.map(p => {
+      const code = p.permissionCode || p.code;
+
+      if (code !== permissionCode) {
+        return p;
+      }
+
+      if (field === 'canUse' && !value) {
+        return { ...p, canUse: false, canDelegate: false };
+      }
+
+      if (field === 'canDelegate' && value && p.canUse !== true) {
+        return p;
+      }
+
+      return { ...p, [field]: value };
+    })
+  );
+}
+
+saveMunicipalityPolicy(policy: any) {
+  const municipalityId = Number(this.selectedMunicipalityId());
+  const permissionCode = policy.permissionCode || policy.code;
+
+  if (!municipalityId || !permissionCode) {
+    this.errorMsg.set('Municipality ও Permission নির্বাচন যাচাই করুন।');
+    return;
+  }
+
+  if (policy.canDelegate && !policy.canUse) {
+    this.errorMsg.set('canDelegate চালু করতে canUse-ও চালু থাকতে হবে।');
+    return;
+  }
+
+  this.policySaving.set(true);
+  this.policySavingCode.set(permissionCode);
+  this.errorMsg.set('');
+  this.successMsg.set('');
+
+  this.admin.updateMunicipalityPermission(municipalityId, {
+    permissionCode,
+    canUse: policy.canUse === true,
+    canDelegate: policy.canDelegate === true
+  }).subscribe({
+    next: () => {
+      this.policySaving.set(false);
+      this.policySavingCode.set('');
+      this.successMsg.set(
+        `Policy সংরক্ষিত: ${permissionCode}`
+      );
+
+      // Server থেকে সর্বশেষ policy আবার আনুন
+      this.loadMunicipalityPolicies();
+    },
+    error: (err) => {
+      this.policySaving.set(false);
+      this.policySavingCode.set('');
+      this.errorMsg.set(
+        err?.error?.message || 'Permission Policy সংরক্ষণ ব্যর্থ।'
+      );
+
+      // UI-কে server-এর state-এ ফিরিয়ে আনুন
+      this.loadMunicipalityPolicies();
+    }
+  });
+}
+
 }

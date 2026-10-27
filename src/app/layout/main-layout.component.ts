@@ -40,10 +40,8 @@ private cleanMenus = computed(() =>
   this.menus()
     .map(m => ({
       ...m,
-      children: (m.children ?? []).filter(c => !this.isAdminPath(c.routePath)),
+      children: m.children ?? [],
     }))
-    .filter(m => !this.isAdminPath(m.routePath))
-    // child নেই আর নিজের route-ও নেই, এমন খালি parent লুকাবে
     .filter(m => m.children.length > 0 || !!m.routePath)
 );
 
@@ -184,4 +182,13 @@ onDocClick(e: MouseEvent) {
   logout(): void {
     this.auth.logout();
   }
+ getMenuRoute(item: MenuItem): string | null {
+  if (item.code === 'ADMIN_USERS') {
+    return this.auth.hasRole('PLATFORM_ADMIN')
+      ? '/admin/users'
+      : '/user-management';
+  }
+
+  return item.routePath;
+}
 }

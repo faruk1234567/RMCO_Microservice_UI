@@ -67,6 +67,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./layout/main-layout.component').then(m => m.MainLayoutComponent),
     children: [
+      {
+  path: 'user-management',
+  loadComponent: () =>
+    import('./features/admin/users/user-admin.component')
+      .then(m => m.UserAdminComponent),
+},
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'committee', loadComponent: () => import('./features/committee/committee-list.component').then(m => m.CommitteeListComponent) },
       { path: 'committee/create', loadComponent: () => import('./features/committee/committee-form.component').then(m => m.CommitteeFormComponent) },
