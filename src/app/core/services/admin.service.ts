@@ -304,5 +304,26 @@ createCitizen(payload: any): Observable<any> {
 }
 
 
+getLookup(type: 'DIVISION' | 'DISTRICT' | 'UPAZILA' | 'UNION') {
+  return this.http.get<any>(`${this.base}/lookups/${type}`);
+}
+
+getLookupChildren(parentId: number | string) {
+  return this.http.get<any>(
+    `${this.base}/lookups/children/${parentId}`
+  );
+}
+
+
+getWards(unionId?: number | string) {
+  let url = `${this.base}/wards`;
+  if (unionId != null && unionId !== '') {
+    url += `?unionId=${unionId}`;
+  }
+  return this.http.get<any>(url);
+}
+
+// already thakle skip korun
+
 
 }
