@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-const API = 'http://localhost:8081/api/v1';
+const API = 'http://localhost:8080/identity-service/api/v1';
 const NEW = '__new__';
 
 interface Row {

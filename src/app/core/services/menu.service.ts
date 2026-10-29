@@ -35,8 +35,8 @@ export interface MenuItemRequest {
 export class MenuService {
   private readonly http = inject(HttpClient);
 
-  private readonly apiUrl =
-    'http://localhost:8083/api/v1/menus';
+ private readonly apiUrl =
+  'http://localhost:8080/config-service/api/v1/menus';
 
   getMenuTree(activeOnly = true): Observable<MenuItem[]> {
     return this.http
