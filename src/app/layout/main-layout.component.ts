@@ -17,6 +17,7 @@ import { Municipality } from '../core/models/user.model';
 @Component({
   selector: 'app-main-layout',
   standalone: true,
+  
   imports: [
     CommonModule,
     RouterOutlet,
@@ -29,6 +30,7 @@ import { Municipality } from '../core/models/user.model';
 export class MainLayoutComponent implements OnInit {
 readonly MAX_VISIBLE = 6;
 readonly MORE_ID = -1;
+
 
 // admin route চেনার জন্য
 private isAdminPath(path?: string | null): boolean {
@@ -113,6 +115,12 @@ onDocClick(e: MouseEvent) {
   reloadMenus(): void {
     this.loadMenuTree();
   }
+  
+/**
+ * Switch active Global Citizen to Municipality Context.
+ */
+
+
 
   private loadMenuTree(): void {
     this.menuLoading.set(true);
@@ -191,4 +199,7 @@ onDocClick(e: MouseEvent) {
 
   return item.routePath;
 }
+
+
+
 }

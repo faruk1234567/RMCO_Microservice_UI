@@ -102,6 +102,59 @@ export class AuthService {
         catchError((err) => throwError(() => err))
       );
   }
+  
+/**
+ * POST /auth/context/municipality
+ * Switch Global Citizen to a Municipality Context.
+ */
+selectMunicipalityContext(municipalityId: number): Observable<any> {
+  return this.http
+    .post<any>(`${this.base}/auth/context/municipality`, {
+      municipalityId,
+    })
+    .pipe(
+      tap((res) => {
+        const data = res?.data ?? res;
+
+        const token =
+          data?.accessToken ??
+          data?.access_token ??
+          data?.token;
+
+        if (!token) {
+          throw new Error('Municipality context token not found');
+        }
+
+        const currentUser = this.currentUserSignal();
+
+        if (!currentUser) {
+          throw new Error('Current user not found');
+        }
+
+        // Preserve existing user information and roles.
+        const updatedUser: AppUser = {
+          ...currentUser,
+          municipalityId: data?.municipalityId ?? municipalityId,
+          nameBn: data?.nameBn ?? currentUser.nameBn,
+          nameEn: data?.nameEn ?? currentUser.nameEn,
+        };
+
+        // Replace Global Login Token with Context Token.
+        localStorage.setItem(TOKEN_KEY, token);
+        localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+
+        this.tokenSignal.set(token);
+        this.currentUserSignal.set(updatedUser);
+
+        console.log('Municipality Context Activated:', {
+          municipalityId: updatedUser.municipalityId,
+          userId: updatedUser.id,
+        });
+      }),
+      catchError((err) => throwError(() => err))
+    );
+}
+
 
   /** POST /platform/auth/login */
 
@@ -401,4 +454,5 @@ console.log('RES KEYS:', Object.keys(res ?? {}));
   createCitizen(payload: any): Observable<any> {
   return this.http.post(`${this.base}/users/citizens`, payload);
 }
+
 }

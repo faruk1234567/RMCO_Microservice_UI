@@ -684,9 +684,11 @@ onUserSearchChange(value: string) {
   this.assignUserId = '';
   this.userResults.set([]);
   this.errorMsg.set('');
+  this.successMsg.set('');
 
   const q = value.trim();
 
+  // Minimum 2 characters required
   if (q.length < 2) {
     this.userSearchLoading.set(false);
     return;
@@ -702,7 +704,6 @@ onUserSearchChange(value: string) {
 
   this.userSearchLoading.set(true);
 
-  // নির্বাচিত Municipality ID-সহ User Search
   this.admin.searchUsers(q, municipalityId).subscribe({
     next: (res: any) => {
       const list = Array.isArray(res)
@@ -719,19 +720,21 @@ onUserSearchChange(value: string) {
       this.userSearchLoading.set(false);
 
       if (list.length === 0) {
-        this.errorMsg.set('এই Municipality-তে কোনো User পাওয়া যায়নি।');
+        this.errorMsg.set(
+          'এই Municipality-তে কোনো User পাওয়া যায়নি।'
+        );
       }
     },
     error: (err) => {
       this.userResults.set([]);
       this.userSearchLoading.set(false);
+
       this.errorMsg.set(
         err?.error?.message || 'User খোঁজা যায়নি।'
       );
     }
   });
 }
-
 onUserSelect(userId: string) {
   this.assignUserId = userId;
 }

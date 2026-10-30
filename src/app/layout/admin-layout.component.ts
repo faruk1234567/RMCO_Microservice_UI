@@ -178,6 +178,7 @@ export class AdminLayoutComponent {
       title: 'প্রতিষ্ঠান',
       items: [
         { label: 'Municipalities', path: '/admin/municipalities' },
+         { label: 'Wards', path: '/admin/wards' },
       ],
     },
   ];

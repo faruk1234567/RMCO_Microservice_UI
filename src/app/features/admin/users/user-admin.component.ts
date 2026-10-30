@@ -289,16 +289,15 @@ const emptyGeo = (): GeoLists => ({
                     <div class="form-group">
                       <label>ওয়ার্ড নং</label>
                       <select
-                        class="form-control"
-                        [name]="key + '_wardId'"
-                        [(ngModel)]="citizenForm[key].wardId"
-                        [disabled]="!citizenForm[key].unionId"
-                      >
-                        <option [ngValue]="null">-- ওয়ার্ড নির্বাচন করুন --</option>
-                        @for (w of geoOf(key).wards; track w.id) {
-                          <option [ngValue]="w.id">{{ geoName(w) }}</option>
-                        }
-                      </select>
+  class="form-control"
+  [name]="key + '_wardId'"
+  [(ngModel)]="citizenForm[key].wardId"
+>
+  <option [ngValue]="null">-- ওয়ার্ড নির্বাচন করুন --</option>
+  @for (w of wards(); track w.id) {
+    <option [ngValue]="w.id">{{ geoName(w) }}</option>
+  }
+</select>
                     </div>
 
                     <div class="form-group">
@@ -1200,6 +1199,7 @@ export class UserAdminComponent implements OnInit, AfterViewInit, OnDestroy {
   creatingCitizen = signal(false);
 
   divisions = signal<any[]>([]);
+  wards = signal<any[]>([]);
   geo = signal<Record<AddrKey, GeoLists>>({
     present: emptyGeo(),
     permanent: emptyGeo(),
@@ -1308,6 +1308,7 @@ export class UserAdminComponent implements OnInit, AfterViewInit, OnDestroy {
     this.showCitizenForm.set(opening);
 
     if (opening) {
+      this.loadWards();
       this.citizenForm = this.emptyCitizenForm();
       this.resetGeo();
       this.loadDivisions();
@@ -1374,6 +1375,16 @@ export class UserAdminComponent implements OnInit, AfterViewInit, OnDestroy {
       },
     });
   }
+  loadWards(): void {
+  this.admin.getWards().subscribe({
+    next: (res: any) => this.wards.set(this.extractList(res)),
+    error: (err: any) => {
+      console.error('WARD API ERROR:', err.status, err.error);
+      this.wards.set([]);
+      this.errorMsg.set(err?.error?.message || 'ওয়ার্ড লোড করা যায়নি।');
+    },
+  });
+}
 
   onDivisionChange(key: AddrKey, id: number | string | null): void {
     const address = this.citizenForm[key];
@@ -1440,7 +1451,7 @@ export class UserAdminComponent implements OnInit, AfterViewInit, OnDestroy {
 
     address.upazilaId = id || null;
     address.unionId = null;
-    address.wardId = null;
+    
 
     this.patchGeo(key, {
       unions: [],
@@ -1462,28 +1473,9 @@ export class UserAdminComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  onUnionChange(key: AddrKey, id: number | string | null): void {
-    const address = this.citizenForm[key];
-
-    address.unionId = id || null;
-    address.wardId = null;
-    this.patchGeo(key, { wards: [] });
-
-    if (id === null || id === undefined || id === '') return;
-
-    this.admin.getWards(id).subscribe({
-      next: (res: any) => {
-        this.patchGeo(key, {
-          wards: this.extractList(res),
-        });
-      },
-      error: (err: any) => {
-        console.error('WARD API ERROR:', err.status, err.error);
-        this.patchGeo(key, { wards: [] });
-      },
-    });
-  }
-
+ onUnionChange(key: AddrKey, id: number | string | null): void {
+  this.citizenForm[key].unionId = id || null;
+}
   private buildAddress(a: any): any | null {
     if (!a) return null;
 

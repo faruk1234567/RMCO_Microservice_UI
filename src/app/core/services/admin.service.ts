@@ -315,12 +315,10 @@ getLookupChildren(parentId: number | string) {
 }
 
 
-getWards(unionId?: number | string) {
-  let url = `${this.base}/wards`;
-  if (unionId != null && unionId !== '') {
-    url += `?unionId=${unionId}`;
-  }
-  return this.http.get<any>(url);
+getWards() {
+  //let url = `${this.base}/wards`;
+  
+  return this.http.get<any>(`${this.base}/wards`);
 }
 
 // already thakle skip korun

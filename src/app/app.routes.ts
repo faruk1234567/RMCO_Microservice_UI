@@ -49,6 +49,12 @@ export const routes: Routes = [
       { path: 'users', loadComponent: () => import('./features/admin/users/user-admin.component').then(m => m.UserAdminComponent) },
       { path: 'invites', loadComponent: () => import('./features/admin/invites/invite.component').then(m => m.InviteComponent) },
       { path: 'lookups', loadComponent: () => import('./features/admin/lookups/lookup.component').then(m => m.LookupComponent) },
+{
+  path: 'wards',
+  loadComponent: () =>
+    import('./features/admin/ward/ward-management.component')
+      .then(m => m.WardManagementComponent),
+},
       {
         path: 'municipalities',
         loadComponent: () =>
@@ -72,6 +78,12 @@ export const routes: Routes = [
   loadComponent: () =>
     import('./features/admin/users/user-admin.component')
       .then(m => m.UserAdminComponent),
+},
+{
+  path: 'wards',
+  loadComponent: () =>
+    import('./features/admin/ward/ward-management.component')
+      .then(m => m.WardManagementComponent),
 },
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'committee', loadComponent: () => import('./features/committee/committee-list.component').then(m => m.CommitteeListComponent) },

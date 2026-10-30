@@ -19,13 +19,19 @@
         <a class="admin-btn" routerLink="/admin">⚙ প্রশাসন</a>
       }
 
-      <div class="user-info">
-        <div class="avatar">{{ userName().charAt(0) }}</div>
-        <div class="user-meta">
-          <span class="user-name">{{ userName() }}</span>
-          <span class="user-muni">{{ municipality() }}</span>
-        </div>
-      </div>
+ 
+<div class="user-info">
+  <div class="avatar">{{ userName().charAt(0) }}</div>
+
+  <div class="user-meta">
+    <span class="user-name">{{ userName() }}</span>
+
+  <span class="user-muni">
+  {{ municipality() }}
+</span>
+  </div>
+</div>
+
 
       <button
         class="icon-btn"
