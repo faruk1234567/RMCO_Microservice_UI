@@ -1,5 +1,18 @@
+
 {
   "/api": {
+    "target": "http://localhost:8080",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/identity-service": {
+    "target": "http://localhost:8080",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/config-service": {
     "target": "http://localhost:8080",
     "secure": false,
     "changeOrigin": true,

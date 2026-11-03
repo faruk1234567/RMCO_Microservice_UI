@@ -1,43 +1,54 @@
-import { Component, OnInit, signal } from '@angular/core';
+// B-07 : অনুমোদন রুটের তালিকা
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ConfigService } from '../../core/services/config.service';
-import { ApprovalRoute } from '../../core/models/config.model';
+import { RouterLink } from '@angular/router';
+import { ConfigAdminService } from '../../core/services/config-admin.service';
+import { CONFIG_STYLES, errMsg } from './config-shared';
 
 @Component({
   selector: 'app-route-list',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
+  styles: [CONFIG_STYLES],
   template: `
     <div class="page-container">
       <div class="page-header">
         <h1>অনুমোদন রুট</h1>
-        <button class="btn btn-primary" (click)="alert('নতুন রুট')">+ নতুন রুট</button>
+        <a routerLink="/config/routes/new" class="btn btn-primary">+ নতুন রুট</a>
       </div>
-      @for (r of routes(); track r.id) {
-        <div class="card mb-2">
-          <div class="card-header">
-            <h3>{{ r.nameBn }} <small class="text-muted">({{ r.code }})</small></h3>
-            <span class="badge" [class]="r.isActive ? 'badge-success' : 'badge-secondary'">{{ r.isActive ? 'সক্রিয়' : 'বন্ধ' }}</span>
-          </div>
-          <div class="card-body">
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-              @for (s of r.steps || []; track s.id; let last = $last) {
-                <div style="background:#f0f7f3;padding:8px 14px;border-radius:8px;font-size:0.9rem">
-                  <strong>{{ s.stepOrder }}. {{ s.nameBn }}</strong>
-                  <div class="text-muted" style="font-size:0.8rem">{{ s.assigneeType }}: {{ s.assigneeValue }} · SLA {{ s.slaHours }}ঘণ্টা</div>
-                </div>
-                @if (!last) { <span style="color:var(--primary);font-weight:700">→</span> }
+      <div class="alert alert-info">রুট একবার তৈরি হলে বদলানো যায় না। ভিন্ন ধাপ দরকার হলে নতুন রুট তৈরি করে কমিটির ধরনের নতুন সংস্করণে সেটি বাছাই করুন।</div>
+      @if (err()) { <div class="alert alert-err">{{ err() }}</div> }
+
+      <div class="card"><div class="card-body table-wrapper">
+        @if (loading()) { <div class="empty">লোড হচ্ছে...</div> }
+        @else if (!items().length) { <div class="empty">কোনো রুট নেই।</div> }
+        @else {
+          <table class="data-table">
+            <thead><tr><th>কোড</th><th>নাম</th><th>ধাপ</th><th>অবস্থা</th><th></th></tr></thead>
+            <tbody>
+              @for (r of items(); track r.id) {
+                <tr>
+                  <td>{{ r.code }}</td>
+                  <td>{{ r.nameBn }}<div class="muted">{{ r.nameEn }}</div></td>
+                  <td>{{ r.stepCount ?? r.steps?.length ?? '—' }}</td>
+                  <td><span class="badge" [class]="r.isActive === false ? 'badge-secondary' : 'badge-success'">{{ r.isActive === false ? 'বন্ধ' : 'চালু' }}</span></td>
+                  <td><a class="btn-ghost btn-sm" style="text-decoration:none" [routerLink]="['/config/routes', r.id]">বিস্তারিত</a></td>
+                </tr>
               }
-            </div>
-          </div>
-        </div>
-      }
+            </tbody>
+          </table>
+        }
+      </div></div>
     </div>
   `,
 })
 export class RouteListComponent implements OnInit {
-  routes = signal<ApprovalRoute[]>([]);
-  constructor(private cfg: ConfigService) {}
-  ngOnInit() { this.cfg.listRoutes().subscribe((r) => this.routes.set(r)); }
-  alert(m: string) { window.alert(m + ' — API কানেক্ট হলে মডাল খুলবে।'); }
+  private svc = inject(ConfigAdminService);
+  items = signal<any[]>([]); loading = signal(true); err = signal('');
+  ngOnInit() {
+    this.svc.listRoutes().subscribe({
+      next: (l) => { this.items.set(l ?? []); this.loading.set(false); },
+      error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
+    });
+  }
 }

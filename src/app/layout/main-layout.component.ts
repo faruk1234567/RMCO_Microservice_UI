@@ -28,7 +28,7 @@ import { Municipality } from '../core/models/user.model';
   styleUrl: './main-layout.component.scss',
 })
 export class MainLayoutComponent implements OnInit {
-readonly MAX_VISIBLE = 6;
+readonly MAX_VISIBLE = 10;
 readonly MORE_ID = -1;
 
 
@@ -142,15 +142,17 @@ onDocClick(e: MouseEvent) {
       });
   }
 
-  private sortMenus(items: MenuItem[]): MenuItem[] {
-    return [...items]
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((item) => ({
-        ...item,
-        children: this.sortMenus(item.children ?? []),
-      }));
-  }
-
+ private sortMenus(items: MenuItem[]): MenuItem[] {
+  return [...items]
+    .sort((a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+      a.id - b.id
+    )
+    .map(item => ({
+      ...item,
+      children: this.sortMenus(item.children ?? [])
+    }));
+}
   private loadMunicipalities(): void {
     this.municipalityLoading.set(true);
 

@@ -2,8 +2,6 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
 import { platformAdminGuard } from './core/guards/platform-admin.guard';
 
-
-
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
   {
@@ -49,12 +47,12 @@ export const routes: Routes = [
       { path: 'users', loadComponent: () => import('./features/admin/users/user-admin.component').then(m => m.UserAdminComponent) },
       { path: 'invites', loadComponent: () => import('./features/admin/invites/invite.component').then(m => m.InviteComponent) },
       { path: 'lookups', loadComponent: () => import('./features/admin/lookups/lookup.component').then(m => m.LookupComponent) },
-{
-  path: 'wards',
-  loadComponent: () =>
-    import('./features/admin/ward/ward-management.component')
-      .then(m => m.WardManagementComponent),
-},
+      {
+        path: 'wards',
+        loadComponent: () =>
+          import('./features/admin/ward/ward-management.component')
+            .then(m => m.WardManagementComponent),
+      },
       {
         path: 'municipalities',
         loadComponent: () =>
@@ -74,17 +72,17 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/main-layout.component').then(m => m.MainLayoutComponent),
     children: [
       {
-  path: 'user-management',
-  loadComponent: () =>
-    import('./features/admin/users/user-admin.component')
-      .then(m => m.UserAdminComponent),
-},
-{
-  path: 'wards',
-  loadComponent: () =>
-    import('./features/admin/ward/ward-management.component')
-      .then(m => m.WardManagementComponent),
-},
+        path: 'user-management',
+        loadComponent: () =>
+          import('./features/admin/users/user-admin.component')
+            .then(m => m.UserAdminComponent),
+      },
+      {
+        path: 'wards',
+        loadComponent: () =>
+          import('./features/admin/ward/ward-management.component')
+            .then(m => m.WardManagementComponent),
+      },
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'committee', loadComponent: () => import('./features/committee/committee-list.component').then(m => m.CommitteeListComponent) },
       { path: 'committee/create', loadComponent: () => import('./features/committee/committee-form.component').then(m => m.CommitteeFormComponent) },
@@ -92,10 +90,19 @@ export const routes: Routes = [
       { path: 'workflow', loadComponent: () => import('./features/workflow/workflow-list.component').then(m => m.WorkflowListComponent) },
       { path: 'workflow/:id', loadComponent: () => import('./features/workflow/workflow-decision.component').then(m => m.WorkflowDecisionComponent) },
       { path: 'document', loadComponent: () => import('./features/document/document-list.component').then(m => m.DocumentListComponent) },
+
+      // ---------- Config (B-01 … B-13) ----------
       { path: 'config/types', loadComponent: () => import('./features/config/type-list.component').then(m => m.TypeListComponent) },
+      { path: 'config/types/:typeId/versions/:versionId', loadComponent: () => import('./features/config/type-editor.component').then(m => m.TypeEditorComponent) },
       { path: 'config/designations', loadComponent: () => import('./features/config/designation-list.component').then(m => m.DesignationListComponent) },
-      { path: 'config/routes', loadComponent: () => import('./features/config/route-list.component').then(m => m.RouteListComponent) },
       { path: 'config/scopes', loadComponent: () => import('./features/config/scope-tree.component').then(m => m.ScopeTreeComponent) },
+      { path: 'config/routes', loadComponent: () => import('./features/config/route-list.component').then(m => m.RouteListComponent) },
+      { path: 'config/routes/:id', loadComponent: () => import('./features/config/route-editor.component').then(m => m.RouteEditorComponent) },
+      { path: 'config/master-items', loadComponent: () => import('./features/config/master-item.component').then(m => m.MasterItemComponent) },
+      { path: 'config/labels', loadComponent: () => import('./features/config/label-template.component').then(m => m.LabelTemplateComponent) },
+      { path: 'config/upload-policy', loadComponent: () => import('./features/config/upload-policy.component').then(m => m.UploadPolicyComponent) },
+      { path: 'config/change-log', loadComponent: () => import('./features/config/change-log.component').then(m => m.ChangeLogComponent) },
+
       { path: 'audit', loadComponent: () => import('./features/audit/audit-list.component').then(m => m.AuditListComponent) },
     ],
   },
