@@ -1,94 +1,108 @@
-import { Component, OnInit, signal } from '@angular/core';
+// C-01 : কমিটির তালিকা ও খোঁজ  +  C-03 : আমার খসড়া (ট্যাব "খসড়া")
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { CommitteeService } from '../../core/services/committee.service';
-import { Committee } from '../../core/models/committee.model';
+import { EngineApiService } from '../../core/services/engine-api.service';
+import { ENGINE_STYLES, Row, STATUS_BN, committeeName, errMsg, fmtDate, idOf, pick } from './engine-shared';
 
 @Component({
   selector: 'app-committee-list',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink],
+  styles: [ENGINE_STYLES],
   template: `
     <div class="page-container">
       <div class="page-header">
-        <h1>কমিটি তালিকা</h1>
-        <a routerLink="/committee/create" class="btn btn-primary">+ নতুন খসড়া</a>
-      </div>
-
-      <div class="filter-bar mb-2">
-        <button class="btn btn-sm" [class.btn-primary]="!filter()" [class.btn-secondary]="filter()" (click)="setFilter('')">সব</button>
-        <button class="btn btn-sm" [class.btn-primary]="filter()==='DRAFT'" [class.btn-secondary]="filter()!=='DRAFT'" (click)="setFilter('DRAFT')">খসড়া</button>
-        <button class="btn btn-sm" [class.btn-primary]="filter()==='IN_APPROVAL'" [class.btn-secondary]="filter()!=='IN_APPROVAL'" (click)="setFilter('IN_APPROVAL')">অনুমোদনাধীন</button>
-        <button class="btn btn-sm" [class.btn-primary]="filter()==='ACTIVE'" [class.btn-secondary]="filter()!=='ACTIVE'" (click)="setFilter('ACTIVE')">সক্রিয়</button>
-        <button class="btn btn-sm" [class.btn-primary]="filter()==='REJECTED'" [class.btn-secondary]="filter()!=='REJECTED'" (click)="setFilter('REJECTED')">প্রত্যাখ্যাত</button>
-      </div>
-
-      @if (loading()) { <div class="spinner"></div> }
-
-      @if (!loading()) {
-        <div class="card">
-          <div class="card-body table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr><th>নাম</th><th>ধরন</th><th>অবস্থা</th><th>মেয়াদ</th><th>সদস্য</th><th>অ্যাকশন</th></tr>
-              </thead>
-              <tbody>
-                @for (c of committees(); track c.id) {
-                  <tr>
-                    <td><a [routerLink]="['/committee', c.id]">{{ c.nameBn }}</a></td>
-                    <td>{{ c.typeNameBn || c.typeCode }}</td>
-                    <td><span class="badge" [class]="statusClass(c.status)">{{ statusLabel(c.status) }}</span></td>
-                    <td>{{ c.termStart ? (c.termStart | date:'yyyy') + '–' + (c.termEnd | date:'yyyy') : '—' }}</td>
-                    <td>{{ c.memberCount ?? 0 }}</td>
-                    <td><a [routerLink]="['/committee', c.id]" class="btn btn-sm btn-secondary">দেখুন</a></td>
-                  </tr>
-                } @empty {
-                  <tr><td colspan="6" class="text-center text-muted">কোনো কমিটি নেই</td></tr>
-                }
-              </tbody>
-            </table>
-          </div>
+        <h1>কমিটি</h1>
+        <div class="row-actions">
+          <a routerLink="/committee/hierarchy" class="btn-ghost" style="text-decoration:none">কার্যপরিধি অনুযায়ী দেখুন</a>
+          <a routerLink="/committee/create" class="btn btn-primary">+ নতুন কমিটি গঠন</a>
         </div>
-      }
+      </div>
+
+      @if (err()) { <div class="alert alert-err">{{ err() }}</div> }
+
+      <div class="tabs-row">
+        @for (t of tabs; track t.v) {
+          <button class="tab-btn" [class.active]="tab() === t.v" (click)="setTab(t.v)">{{ t.l }} ({{ count(t.v) }})</button>
+        }
+      </div>
+
+      <div class="toolbar">
+        <input class="form-control" style="max-width:300px" placeholder="কমিটির নাম দিয়ে খুঁজুন" [ngModel]="q()" (ngModelChange)="q.set($event); page.set(0)" />
+        <span class="muted">{{ filtered().length }}টি ফলাফল</span>
+      </div>
+
+      <div class="card"><div class="card-body table-wrapper">
+        @if (loading()) { <div class="empty">লোড হচ্ছে...</div> }
+        @else if (!filtered().length) {
+          <div class="empty">
+            @if (tab() === 'DRAFT') { কোনো অসম্পূর্ণ খসড়া নেই। } @else { কোনো কমিটি পাওয়া যায়নি। }
+          </div>
+        } @else {
+          <table class="data-table">
+            <thead><tr><th>নাম</th><th>ধরন</th><th>কার্যপরিধি</th><th>সদস্য</th><th>অবস্থা</th><th>সর্বশেষ পরিবর্তন</th><th></th></tr></thead>
+            <tbody>
+              @for (r of pageRows(); track id(r)) {
+                <tr>
+                  <td><strong>{{ name(r) }}</strong></td>
+                  <td>{{ pick(r, 'typeName', 'committeeTypeName', 'typeNameBn') || '—' }}</td>
+                  <td>{{ pick(r, 'scopeName', 'scopeNodeName') || '—' }}</td>
+                  <td>{{ pick(r, 'memberCount', 'activeMemberCount') ?? '—' }}</td>
+                  <td><span [class]="'st st-' + r['status']">{{ bn(r['status']) }}</span></td>
+                  <td>{{ fmt(pick(r, 'updatedAt', 'createdAt')) }}</td>
+                  <td>
+                    @if (r['status'] === 'DRAFT') {
+                      <a class="btn-ghost btn-sm" style="text-decoration:none" routerLink="/committee/create" [queryParams]="{ draftId: id(r) }">চালিয়ে যান</a>
+                    } @else {
+                      <a class="btn-ghost btn-sm" style="text-decoration:none" [routerLink]="['/committee', id(r)]">বিস্তারিত</a>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <div class="toolbar" style="margin-top:12px">
+            <button class="btn-ghost btn-sm" [disabled]="page() === 0" (click)="page.set(page() - 1)">← আগের</button>
+            <span class="muted">পৃষ্ঠা {{ page() + 1 }} / {{ pages() }}</span>
+            <button class="btn-ghost btn-sm" [disabled]="page() + 1 >= pages()" (click)="page.set(page() + 1)">পরের →</button>
+          </div>
+        }
+      </div></div>
     </div>
   `,
-  styles: [`.filter-bar { display:flex; gap:8px; flex-wrap:wrap; }`],
 })
 export class CommitteeListComponent implements OnInit {
-  committees = signal<Committee[]>([]);
+  private api = inject(EngineApiService);
+  tabs = [
+    { v: '', l: 'সব' }, { v: 'DRAFT', l: 'খসড়া' }, { v: 'PENDING_APPROVAL', l: 'অনুমোদনাধীন' },
+    { v: 'ACTIVE', l: 'সক্রিয়' }, { v: 'REJECTED', l: 'প্রত্যাখ্যাত' },
+  ];
+  all = signal<Row[]>([]);
+  tab = signal('');
+  q = signal('');
+  page = signal(0);
+  size = 10;
   loading = signal(true);
-  filter = signal('');
+  err = signal('');
 
-  constructor(private committeeSvc: CommitteeService) {}
+  pick = pick; id = idOf; name = committeeName; fmt = (v: any) => fmtDate(v, true);
+  bn = (s: string) => STATUS_BN[s] ?? s;
 
-  ngOnInit() { this.load(); }
+  filtered = computed(() => {
+    const t = this.tab(), s = this.q().trim().toLowerCase();
+    return this.all().filter(r => (!t || r['status'] === t) && (!s || committeeName(r).toLowerCase().includes(s)));
+  });
+  pages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.size)));
+  pageRows = computed(() => this.filtered().slice(this.page() * this.size, (this.page() + 1) * this.size));
+  count = (v: string) => this.all().filter(r => !v || r['status'] === v).length;
 
-  setFilter(s: string) {
-    this.filter.set(s);
-    this.load();
-  }
-
-  load() {
-    this.loading.set(true);
-    this.committeeSvc.list(this.filter() || undefined).subscribe({
-      next: (list) => { this.committees.set(list); this.loading.set(false); },
-      error: () => this.loading.set(false),
+  ngOnInit() {
+    this.api.listCommittees().subscribe({
+      next: (l) => { this.all.set(l ?? []); this.loading.set(false); },
+      error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
     });
   }
-
-  statusLabel(s: string): string {
-    const map: Record<string, string> = {
-      DRAFT: 'খসড়া', SUBMITTED: 'জমা', IN_APPROVAL: 'অনুমোদনাধীন',
-      ACTIVE: 'সক্রিয়', REJECTED: 'প্রত্যাখ্যাত', EXPIRED: 'মেয়াদোত্তীর্ণ', DISSOLVED: 'বিলুপ্ত',
-    };
-    return map[s] || s;
-  }
-
-  statusClass(s: string): string {
-    const map: Record<string, string> = {
-      DRAFT: 'badge-warning', IN_APPROVAL: 'badge-info', ACTIVE: 'badge-success',
-      REJECTED: 'badge-danger', SUBMITTED: 'badge-info',
-    };
-    return map[s] || 'badge-secondary';
-  }
+  setTab(v: string) { this.tab.set(v); this.page.set(0); }
 }

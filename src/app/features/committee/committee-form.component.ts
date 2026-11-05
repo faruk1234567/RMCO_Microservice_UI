@@ -1,229 +1,406 @@
-import { Component, OnInit, signal } from '@angular/core';
+// C-02 : কমিটি গঠন (৫ ধাপ) — এবং C-03 থেকে ?draftId= দিয়ে খসড়া চালিয়ে যাওয়া
+// ধাপ: ১ ধরন ও কার্যপরিধি → ২ সদস্য → ৩ বাড়তি তথ্য → ৪ প্রস্তাব ও নথি → ৫ পর্যালোচনা ও জমা
+// প্রতিটি "পরবর্তী" চাপলে খসড়া নিজে থেকে সংরক্ষিত হয়।
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
-import { CommitteeService } from '../../core/services/committee.service';
-import { CommitteeType, CommitteeTypeVersion, TypeDesignation } from '../../core/models/committee.model';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Observable, catchError, forkJoin, of } from 'rxjs';
+import { EngineApiService } from '../../core/services/engine-api.service';
+import { ConfigAdminService } from '../../core/services/config-admin.service';
+import { ConfigService } from '../../core/services/config.service';
+import { CommitteeTypeRow, Designation, DynamicField, ScopeNode } from '../../core/models/config-admin.model';
+import { flattenTree, versionsOf } from '../config/config-shared';
+import { DocumentUploaderComponent } from '../document/document-uploader.component';
+import { DynamicFormComponent, validateFields } from './dynamic-form.component';
+import { ENGINE_STYLES, Row, errMsg, maskMobile } from './engine-shared';
 
-interface MemberRow {
-  designationId: string;
-  designationName: string;
-  userId: string;
-  userName: string;
-  isPrimary: boolean;
-}
+interface MemberRow { designationId: string; name: string; mobile: string; fields: Record<string, any>; }
+interface NewMember { name: string; mobile: string; fields: Record<string, any>; }
+const MOBILE_RE = /^01[3-9]\d{8}$/;
 
 @Component({
   selector: 'app-committee-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, DynamicFormComponent, DocumentUploaderComponent],
+  styles: [ENGINE_STYLES],
   template: `
     <div class="page-container">
       <div class="page-header">
-        <h1>নতুন কমিটি খসড়া</h1>
-        <a routerLink="/committee" class="btn btn-secondary">বাতিল</a>
+        <div>
+          <a routerLink="/committee" class="muted">← কমিটির তালিকা</a>
+          <h1>{{ draftId() ? 'কমিটি খসড়া সম্পাদনা' : 'নতুন কমিটি গঠন' }}</h1>
+        </div>
+        @if (savedAt()) { <span class="muted">খসড়া সংরক্ষিত: {{ savedAt() }}</span> }
       </div>
 
-      @if (errorMsg()) { <div class="alert alert-danger">{{ errorMsg() }}</div> }
-      @if (successMsg()) { <div class="alert alert-success">{{ successMsg() }}</div> }
+      @if (err()) { <div class="alert alert-err">{{ err() }}</div> }
+      @if (loading()) { <div class="empty">লোড হচ্ছে...</div> }
+      @else {
+        <div class="stepper">
+          @for (s of steps; track $index; let i = $index) {
+            <button type="button" class="step" [class.active]="i === step()" [class.done]="i < step()" [disabled]="i > maxStep()" (click)="step.set(i)">
+              <span class="no">{{ i + 1 }}</span>{{ s }}
+            </button>
+          }
+        </div>
 
-      <div class="card">
-        <div class="card-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label>কমিটির ধরন <span class="required">*</span></label>
-              <select class="form-control" [(ngModel)]="selectedTypeId" (ngModelChange)="onTypeChange($event)">
-                <option value="">-- বাছাই করুন --</option>
-                @for (t of types(); track t.id) {
-                  <option [value]="t.latestPublishedVersionId">{{ t.nameBn }} (v{{ t.latestVersionNo }})</option>
-                }
-              </select>
-            </div>
-            <div class="form-group">
-              <label>নাম (বাংলা) <span class="required">*</span></label>
-              <input class="form-control" [(ngModel)]="nameBn" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Name (English)</label>
-              <input class="form-control" [(ngModel)]="nameEn" />
-            </div>
-            <div class="form-group">
-              <label>মেয়াদ শুরু</label>
-              <input type="date" class="form-control" [(ngModel)]="termStart" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label>বিবরণ</label>
-            <textarea class="form-control" [(ngModel)]="description" rows="3"></textarea>
-          </div>
+        @switch (step()) {
 
-          @if (version()) {
-            <h4 style="margin:20px 0 12px">
-              সদস্য তালিকা
-              <small class="text-muted">
-                (সর্বনিম্ন {{ version()!.composition?.minMembers }} –
-                সর্বোচ্চ {{ version()!.composition?.maxMembers }})
-              </small>
-            </h4>
-
-            <div class="card mb-2" style="border:1px dashed var(--border)">
-              <div class="card-body">
-                <div class="form-row">
-                  <div class="form-group">
-                    <label>পদবী</label>
-                    <select class="form-control" [(ngModel)]="addDesignationId">
-                      <option value="">-- পদবী --</option>
-                      @for (d of version()!.designations || []; track d.id) {
-                        <option [value]="d.designationId">
-                          {{ d.designationNameBn }}
-                          @if (d.isMandatory) { (আবশ্যক) }
-                          ({{ d.minCount }}–{{ d.maxCount }})
-                        </option>
-                      }
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label>সদস্যের নাম / User ID</label>
-                    <input class="form-control" [(ngModel)]="addUserName" placeholder="নাম লিখুন" />
-                  </div>
+          @case (0) {
+            <div class="card"><div class="card-body">
+              <div class="grid2">
+                <div class="form-group">
+                  <label>কমিটির ধরন <span class="required">*</span></label>
+                  <select class="form-control" [(ngModel)]="typeId" (ngModelChange)="onType()" [disabled]="!!draftId()">
+                    <option value="">— বাছাই করুন —</option>
+                    @for (t of publishedTypes(); track t.id) { <option [value]="t.id">{{ t.nameBn }}</option> }
+                  </select>
+                  @if (!publishedTypes().length) { <div class="muted">কোনো প্রকাশিত ধরন নেই। আগে কনফিগারেশন থেকে ধরন প্রকাশ করুন।</div> }
                 </div>
-                <button class="btn btn-sm btn-secondary" (click)="addMember()" [disabled]="!addDesignationId || !addUserName">
-                  + সদস্য যোগ
-                </button>
+                <div class="form-group">
+                  <label>সংস্করণ <span class="required">*</span></label>
+                  <select class="form-control" [(ngModel)]="versionId" (ngModelChange)="loadVersion()" [disabled]="!!draftId() || !typeId">
+                    <option value="">— বাছাই করুন —</option>
+                    @for (v of pubVersions(); track v.id) { <option [value]="v.id">সংস্করণ {{ v.versionNo }}</option> }
+                  </select>
+                </div>
               </div>
-            </div>
 
-            @if (members().length) {
-              <table class="data-table">
-                <thead><tr><th>পদবী</th><th>নাম</th><th>প্রাথমিক</th><th></th></tr></thead>
-                <tbody>
-                  @for (m of members(); track $index) {
-                    <tr>
-                      <td>{{ m.designationName }}</td>
-                      <td>{{ m.userName }}</td>
-                      <td>{{ m.isPrimary ? 'হ্যাঁ' : 'না' }}</td>
-                      <td><button class="btn btn-sm btn-danger" (click)="removeMember($index)">×</button></td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            }
+              @if (ver(); as v) {
+                <div class="alert alert-info">
+                  <strong>{{ v['nameBn'] }}</strong> —
+                  মোট সদস্য সর্বোচ্চ {{ v['maxMembers'] || 'সীমাহীন' }}, পদবী {{ (v['designations'] || []).length }}টি।
+                  @if (rule('FORMATION')?.['approvalRequired']) { গঠনের জন্য অনুমোদন লাগবে। } @else { অনুমোদন ছাড়াই সক্রিয় হবে। }
+                </div>
+              }
+
+              <div class="form-group">
+                <label>কার্যপরিধির node <span class="required">*</span></label>
+                <select class="form-control" [(ngModel)]="form.scopeNodeId" [disabled]="!!draftId() || !ver()">
+                  <option [ngValue]="null">— বাছাই করুন —</option>
+                  @for (f of allowedNodes(); track f.node.id) { <option [ngValue]="f.node.id">{{ '— '.repeat(f.depth) }}{{ f.node.nameBn }} ({{ f.node.levelNameBn || ('স্তর ' + f.node.levelNo) }})</option> }
+                </select>
+                @if (ver() && !allowedNodes().length) { <div class="muted bad-text">এই ধরনের জন্য অনুমোদিত স্তরে কোনো node নেই।</div> }
+              </div>
+              <div class="grid2">
+                <div class="form-group"><label>কমিটির নাম (বাংলা) <span class="required">*</span></label>
+                  <input class="form-control" [(ngModel)]="form.nameBn" /></div>
+                <div class="form-group"><label>Name (English)</label>
+                  <input class="form-control" [(ngModel)]="form.nameEn" /></div>
+              </div>
+            </div></div>
           }
 
-          <div style="display:flex;gap:10px;margin-top:24px">
-            <button class="btn btn-secondary" [disabled]="saving()" (click)="saveDraft()">
-              {{ saving() ? 'সংরক্ষণ হচ্ছে...' : 'খসড়া সংরক্ষণ' }}
-            </button>
-            <button class="btn btn-primary" [disabled]="saving()" (click)="saveAndSubmit()">
-              {{ saving() ? 'জমা হচ্ছে...' : 'জমা দিন (অনুমোদনের জন্য)' }}
-            </button>
-          </div>
+          @case (1) {
+            @if (!designationRules().length) { <div class="alert alert-warn">এই ধরনে কোনো পদবী নির্ধারিত নেই।</div> }
+            @for (d of designationRules(); track d['designationId']) {
+              <div class="card mb-2">
+                <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                  <h3>{{ desigName(d['designationId']) }}</h3>
+                  <span [class]="countClass(d)">
+                    {{ countOf(d['designationId']) }} জন
+                    (কমপক্ষে {{ d['minCount'] || 0 }}, সর্বোচ্চ {{ d['maxCount'] || 'সীমাহীন' }}@if (d['mandatory']) {, বাধ্যতামূলক})
+                  </span>
+                </div>
+                <div class="card-body">
+                  @for (m of membersOf(d['designationId']); track $index) {
+                    <div class="row-actions" style="padding:6px 0;border-bottom:1px solid #eef1f2">
+                      <strong>{{ m.name }}</strong><span class="muted">{{ mask(m.mobile) }}</span>
+                      <span class="grow"></span>
+                      <button class="btn-ghost btn-sm" (click)="removeMember(m)">সরান</button>
+                    </div>
+                  }
+                  <div class="section-title" style="margin-top:12px">সদস্য যোগ করুন</div>
+                  <div class="grid2">
+                    <div class="form-group"><label>নাম <span class="required">*</span></label>
+                      <input class="form-control" [(ngModel)]="nm(d['designationId']).name" /></div>
+                    <div class="form-group"><label>মোবাইল নম্বর <span class="required">*</span></label>
+                      <input class="form-control" maxlength="11" placeholder="01XXXXXXXXX" [(ngModel)]="nm(d['designationId']).mobile" /></div>
+                  </div>
+                  <app-dynamic-form [fields]="memberFields()" [values]="nm(d['designationId']).fields" (valuesChange)="nm(d['designationId']).fields = $event" />
+                  @if (memberError(d['designationId'])) { <div class="muted bad-text" style="margin-bottom:6px">{{ memberError(d['designationId']) }}</div> }
+                  <button class="btn-ghost" (click)="addMember(d['designationId'])">+ যোগ করুন</button>
+                </div>
+              </div>
+            }
+            <div class="alert alert-info">মোট {{ form.members.length }} জন @if (ver()?.['maxMembers']) { / সর্বোচ্চ {{ ver()!['maxMembers'] }} }।
+              মোবাইল OTP যাচাইয়ের API এখনো নেই, তাই এই ধাপে OTP নেওয়া হচ্ছে না।</div>
+          }
+
+          @case (2) {
+            <div class="card"><div class="card-body">
+              <app-dynamic-form [fields]="committeeFields()" [values]="form.fields" (valuesChange)="form.fields = $event" />
+            </div></div>
+          }
+
+          @case (3) {
+            <div class="card"><div class="card-body">
+              @if (!rule('FORMATION')?.['resolutionRequired']) { <div class="alert alert-info">এই ধরনে প্রস্তাব ঐচ্ছিক।</div> }
+              <div class="grid2">
+                <div class="form-group"><label>প্রস্তাব নম্বর @if (rule('FORMATION')?.['resolutionRequired']) { <span class="required">*</span> }</label>
+                  <input class="form-control" [(ngModel)]="form.resolution.number" /></div>
+                <div class="form-group"><label>প্রস্তাবের তারিখ @if (rule('FORMATION')?.['resolutionRequired']) { <span class="required">*</span> }</label>
+                  <input type="date" class="form-control" [(ngModel)]="form.resolution.date" /></div>
+              </div>
+              <app-dynamic-form [fields]="resolutionFields()" [values]="form.resolution.fields" (valuesChange)="form.resolution.fields = $event" />
+              <div class="section-title" style="margin-top:12px">প্রস্তাবের নথি</div>
+              @if (form.resolution.documentId) {
+                <div class="alert alert-ok">নথি সংযুক্ত হয়েছে (ID: {{ form.resolution.documentId }})।</div>
+              }
+              <app-document-uploader (ready)="onDoc($event)" (cleared)="form.resolution.documentId = null" />
+            </div></div>
+          }
+
+          @case (4) {
+            <div class="card mb-2"><div class="card-header"><h3>সারসংক্ষেপ</h3></div><div class="card-body">
+              <dl class="kv">
+                <dt>কমিটির নাম</dt><dd>{{ form.nameBn }} {{ form.nameEn }}</dd>
+                <dt>ধরন</dt><dd>{{ ver()?.['nameBn'] }} (সংস্করণ {{ ver()?.['versionNo'] }})</dd>
+                <dt>কার্যপরিধি</dt><dd>{{ nodeName() }}</dd>
+                <dt>সদস্য</dt><dd>{{ form.members.length }} জন</dd>
+                <dt>প্রস্তাব</dt><dd>{{ form.resolution.number || '—' }} · {{ form.resolution.date || '—' }} · {{ form.resolution.documentId ? 'নথি আছে' : 'নথি নেই' }}</dd>
+                <dt>অনুমোদন</dt><dd>{{ rule('FORMATION')?.['approvalRequired'] ? 'লাগবে' : 'লাগবে না' }}</dd>
+              </dl>
+              <div class="section-title" style="margin-top:14px">সদস্য তালিকা</div>
+              <table class="data-table"><thead><tr><th>পদবী</th><th>নাম</th><th>মোবাইল</th></tr></thead>
+                <tbody>@for (m of form.members; track $index) { <tr><td>{{ desigName(m.designationId) }}</td><td>{{ m.name }}</td><td>{{ mask(m.mobile) }}</td></tr> }</tbody></table>
+            </div></div>
+            @if (problems().length) {
+              <div class="alert alert-err">জমা দেওয়ার আগে এগুলো ঠিক করুন:<ul>@for (p of problems(); track $index) { <li>{{ p }}</li> }</ul></div>
+            } @else {
+              <div class="alert alert-ok">সব তথ্য ঠিক আছে। জমা দিতে প্রস্তুত।</div>
+            }
+          }
+        }
+
+        <div class="toolbar" style="margin-top:16px">
+          <button class="btn-ghost" [disabled]="step() === 0 || busy()" (click)="step.set(step() - 1)">← আগের ধাপ</button>
+          <span class="grow"></span>
+          @if (step() > 0) { <button class="btn-ghost" [disabled]="busy()" (click)="saveOnly()">খসড়া সংরক্ষণ</button> }
+          @if (step() < steps.length - 1) {
+            <button class="btn btn-primary" [disabled]="busy() || !!stepError()" (click)="next()">{{ busy() ? 'অপেক্ষা করুন...' : 'পরবর্তী ধাপ →' }}</button>
+          } @else {
+            <button class="btn btn-primary" [disabled]="busy() || problems().length > 0" (click)="submit()">{{ busy() ? 'জমা হচ্ছে...' : 'কমিটি জমা দিন' }}</button>
+          }
         </div>
-      </div>
+        @if (stepError()) { <div class="muted bad-text" style="text-align:right;margin-top:6px">{{ stepError() }}</div> }
+      }
     </div>
   `,
 })
 export class CommitteeFormComponent implements OnInit {
-  types = signal<CommitteeType[]>([]);
-  version = signal<CommitteeTypeVersion | null>(null);
-  members = signal<MemberRow[]>([]);
-  saving = signal(false);
-  errorMsg = signal('');
-  successMsg = signal('');
+  private api = inject(EngineApiService);
+  private cfgAdmin = inject(ConfigAdminService);
+  private cfg = inject(ConfigService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
-  selectedTypeId = '';
-  nameBn = '';
-  nameEn = '';
-  termStart = '';
-  description = '';
-  addDesignationId = '';
-  addUserName = '';
+  steps = ['ধরন ও কার্যপরিধি', 'সদস্য নির্বাচন', 'বাড়তি তথ্য', 'প্রস্তাব ও নথি', 'পর্যালোচনা ও জমা'];
+  step = signal(0);
+  maxStep = signal(0);
+  loading = signal(true); busy = signal(false);
+  err = signal(''); savedAt = signal('');
+  draftId = signal<string | null>(null);
 
-  constructor(private committeeSvc: CommitteeService, private router: Router) {}
+  types = signal<CommitteeTypeRow[]>([]);
+  tree = signal<ScopeNode[]>([]);
+  designations = signal<Designation[]>([]);
+  ver = signal<Row | null>(null);
 
+  typeId = ''; versionId = '';
+  form = {
+    nameBn: '', nameEn: '', scopeNodeId: null as string | null,
+    members: [] as MemberRow[], fields: {} as Record<string, any>,
+    resolution: { number: '', date: '', documentId: null as string | null, fields: {} as Record<string, any> },
+  };
+  private newMembers: Record<string, NewMember> = {};
+  private memberErr: Record<string, string> = {};
+  mask = maskMobile;
+
+  publishedTypes = computed(() => this.types().filter(t => versionsOf(t).some(v => v.status === 'PUBLISHED')));
+  pubVersions = () => {
+    const t = this.types().find(x => x.id === this.typeId);
+    return t ? versionsOf(t).filter(v => v.status === 'PUBLISHED') : [];
+  };
+  designationRules = computed<Row[]>(() => this.ver()?.['designations'] ?? []);
+  private allFields = computed<DynamicField[]>(() => this.ver()?.['fields'] ?? []);
+  committeeFields = computed(() => this.allFields().filter(f => f.target === 'COMMITTEE'));
+  memberFields = computed(() => this.allFields().filter(f => f.target === 'MEMBER'));
+  resolutionFields = computed(() => this.allFields().filter(f => f.target === 'RESOLUTION'));
+  rule = (k: string): Row | undefined => this.ver()?.['rules']?.[k];
+
+  allowedNodes = () => {
+    const levels: number[] = this.ver()?.['scopeLevelNos'] ?? [];
+    const flat = flattenTree(this.tree());
+    return levels.length ? flat.filter(f => levels.includes(f.node.levelNo)) : flat;
+  };
+  nodeName = () => flattenTree(this.tree()).find(f => f.node.id === this.form.scopeNodeId)?.node.nameBn ?? '—';
+  desigName = (id: string) => this.designations().find(d => d.id === id)?.nameBn ?? id;
+  membersOf = (id: string) => this.form.members.filter(m => m.designationId === id);
+  countOf = (id: string) => this.membersOf(id).length;
+  nm(id: string): NewMember { return (this.newMembers[id] ??= { name: '', mobile: '', fields: {} }); }
+  memberError = (id: string) => this.memberErr[id] ?? '';
+
+  countClass(d: Row): string {
+    const n = this.countOf(d['designationId']);
+    const bad = n < (d['minCount'] || (d['mandatory'] ? 1 : 0)) || (d['maxCount'] && n > d['maxCount']);
+    return bad ? 'st st-REJECTED' : 'st st-ACTIVE';
+  }
+
+  // ---------------- লোড ----------------
   ngOnInit() {
-    this.committeeSvc.getPublishedTypes().subscribe((t) => this.types.set(t));
-  }
-
-  onTypeChange(versionId: string) {
-    if (!versionId) { this.version.set(null); return; }
-    this.committeeSvc.getTypeVersion(versionId).subscribe((v) => this.version.set(v));
-  }
-
-  addMember() {
-    const des = this.version()?.designations?.find((d) => d.designationId === this.addDesignationId);
-    if (!des) return;
-    this.members.update((list) => [
-      ...list,
-      {
-        designationId: des.designationId,
-        designationName: des.designationNameBn || '',
-        userId: 'u-temp-' + Date.now(),
-        userName: this.addUserName,
-        isPrimary: des.isSingleHolder,
-      },
-    ]);
-    this.addUserName = '';
-    this.addDesignationId = '';
-  }
-
-  removeMember(idx: number) {
-    this.members.update((list) => list.filter((_, i) => i !== idx));
-  }
-
-  private buildPayload() {
-    return {
-      typeVersionId: this.selectedTypeId,
-      nameBn: this.nameBn,
-      nameEn: this.nameEn || undefined,
-      termStart: this.termStart || undefined,
-      description: this.description || undefined,
-      members: this.members().map((m) => ({
-        userId: m.userId,
-        designationId: m.designationId,
-        isPrimary: m.isPrimary,
-      })),
-    };
-  }
-
-  saveDraft() {
-    if (!this.selectedTypeId || !this.nameBn.trim()) {
-      this.errorMsg.set('ধরন এবং নাম আবশ্যক।');
-      return;
-    }
-    this.saving.set(true);
-    this.errorMsg.set('');
-    this.committeeSvc.createDraft(this.buildPayload()).subscribe({
-      next: (c) => {
-        this.saving.set(false);
-        this.successMsg.set('খসড়া সংরক্ষিত হয়েছে।');
-        setTimeout(() => this.router.navigate(['/committee', c.id]), 800);
-      },
-      error: () => { this.saving.set(false); this.errorMsg.set('সংরক্ষণ ব্যর্থ।'); },
+    forkJoin({
+      types: this.cfgAdmin.listTypes(true).pipe(catchError(() => of([] as CommitteeTypeRow[]))),
+      tree: this.cfgAdmin.scopeTree().pipe(catchError(() => of([] as ScopeNode[]))),
+      desig: this.cfg.listDesignations().pipe(catchError(() => of([] as Designation[]))),
+    }).subscribe(({ types, tree, desig }) => {
+      this.types.set(types); this.tree.set(tree); this.designations.set(desig as Designation[]);
+      const draft = this.route.snapshot.queryParamMap.get('draftId');
+      if (draft) this.loadDraft(draft); else this.loading.set(false);
     });
   }
 
-  saveAndSubmit() {
-    if (!this.selectedTypeId || !this.nameBn.trim()) {
-      this.errorMsg.set('ধরন এবং নাম আবশ্যক।');
-      return;
-    }
-    this.saving.set(true);
-    this.errorMsg.set('');
-    this.committeeSvc.createDraft(this.buildPayload()).subscribe({
-      next: (c) => {
-        this.committeeSvc.submitDraft(c.id).subscribe({
-          next: () => {
-            this.saving.set(false);
-            this.successMsg.set('জমা দেওয়া হয়েছে। অনুমোদনের জন্য পাঠানো হয়েছে।');
-            setTimeout(() => this.router.navigate(['/committee']), 1000);
-          },
-          error: () => { this.saving.set(false); this.errorMsg.set('জমা ব্যর্থ।'); },
-        });
+  /** ⚠ খসড়ার response-এর কাঠামো অনুমান: payload বা সরাসরি field থেকে পড়া হয় */
+  private loadDraft(id: string) {
+    this.api.getCommittee(id).subscribe({
+      next: (r) => {
+        if (r['status'] && r['status'] !== 'DRAFT') { this.err.set('শুধু খসড়া সম্পাদনা করা যায়।'); this.loading.set(false); return; }
+        const p: Row = r['payload'] ?? r;
+        this.draftId.set(id);
+        this.typeId = r['committeeTypeId'] ?? r['typeId'] ?? '';
+        this.versionId = r['typeVersionId'] ?? r['versionId'] ?? '';
+        this.form.nameBn = r['nameBn'] ?? p['nameBn'] ?? ''; this.form.nameEn = r['nameEn'] ?? p['nameEn'] ?? '';
+        this.form.scopeNodeId = r['scopeNodeId'] ?? p['scopeNodeId'] ?? null;
+        this.form.members = p['members'] ?? []; this.form.fields = p['fields'] ?? {};
+        const res = p['resolution'] ?? {};
+        this.form.resolution = { number: res['number'] ?? '', date: res['date'] ?? '', documentId: res['documentId'] ?? null, fields: res['fields'] ?? {} };
+        this.maxStep.set(this.steps.length - 1);
+        if (this.versionId) this.loadVersion(); this.loading.set(false);
       },
-      error: () => { this.saving.set(false); this.errorMsg.set('সংরক্ষণ ব্যর্থ।'); },
+      error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
+    });
+  }
+
+  onType() { this.versionId = ''; this.ver.set(null); const v = this.pubVersions(); if (v.length) { this.versionId = v[v.length - 1].id; this.loadVersion(); } }
+  loadVersion() {
+    if (!this.versionId) { this.ver.set(null); return; }
+    this.cfgAdmin.getVersion(this.versionId).subscribe({ next: v => this.ver.set(v), error: e => this.err.set(errMsg(e)) });
+  }
+
+  // ---------------- সদস্য ----------------
+  addMember(desigId: string) {
+    const n = this.nm(desigId);
+    const name = n.name.trim(), mobile = n.mobile.trim();
+    const d = this.designationRules().find(x => x['designationId'] === desigId);
+    let e = '';
+    if (!name) e = 'নাম দিন।';
+    else if (!MOBILE_RE.test(mobile)) e = 'মোবাইল নম্বর ১১ অঙ্কের সঠিক নম্বর হতে হবে (01XXXXXXXXX)।';
+    else if (this.form.members.some(m => m.mobile === mobile)) e = 'এই মোবাইল নম্বর ইতিমধ্যে যোগ করা হয়েছে।';
+    else if (d?.['maxCount'] && this.countOf(desigId) >= d['maxCount']) e = 'এই পদবীর সর্বোচ্চ সংখ্যা পূর্ণ।';
+    else if (this.ver()?.['maxMembers'] && this.form.members.length >= this.ver()!['maxMembers']) e = 'মোট সদস্যের সীমা পূর্ণ।';
+    else { const fe = validateFields(this.memberFields(), n.fields); if (fe.length) e = fe[0]; }
+    this.memberErr[desigId] = e;
+    if (e) return;
+    this.form.members = [...this.form.members, { designationId: desigId, name, mobile, fields: n.fields }];
+    this.newMembers[desigId] = { name: '', mobile: '', fields: {} };
+  }
+  removeMember(m: MemberRow) { this.form.members = this.form.members.filter(x => x !== m); }
+
+  onDoc(d: Row) {
+    this.form.resolution.documentId = String(d['id']);
+    const id = this.draftId();
+    if (id) this.api.attachUsage(String(d['id']), 'COMMITTEE_DRAFT', id).subscribe({ error: e => this.err.set('নথি সংযুক্ত করা যায়নি: ' + errMsg(e)) });
+  }
+
+  // ---------------- যাচাই ----------------
+  stepError(): string {
+    switch (this.step()) {
+      case 0:
+        if (!this.versionId || !this.ver()) return 'কমিটির ধরন ও সংস্করণ বাছাই করুন।';
+        if (!this.form.scopeNodeId) return 'কার্যপরিধির node বাছাই করুন।';
+        if (!this.form.nameBn.trim()) return 'কমিটির নাম দিন।';
+        return '';
+      case 1: return this.memberProblems()[0] ?? '';
+      case 2: return validateFields(this.committeeFields(), this.form.fields)[0] ?? '';
+      case 3: return this.resolutionProblems()[0] ?? '';
+      default: return '';
+    }
+  }
+  private memberProblems(): string[] {
+    const p: string[] = [];
+    for (const d of this.designationRules()) {
+      const n = this.countOf(d['designationId']), name = this.desigName(d['designationId']);
+      const min = d['minCount'] || (d['mandatory'] ? 1 : 0);
+      if (n < min) p.push(`${name}: কমপক্ষে ${min} জন দরকার (এখন ${n})`);
+      if (d['maxCount'] && n > d['maxCount']) p.push(`${name}: সর্বোচ্চ ${d['maxCount']} জন`);
+    }
+    const max = this.ver()?.['maxMembers'];
+    if (max && this.form.members.length > max) p.push(`মোট সদস্য সর্বোচ্চ ${max} জন`);
+    return p;
+  }
+  private resolutionProblems(): string[] {
+    const p: string[] = [];
+    if (this.rule('FORMATION')?.['resolutionRequired']) {
+      if (!this.form.resolution.number.trim()) p.push('প্রস্তাব নম্বর দিন');
+      if (!this.form.resolution.date) p.push('প্রস্তাবের তারিখ দিন');
+      if (!this.form.resolution.documentId) p.push('প্রস্তাবের নথি আপলোড করুন (স্ক্যান শেষ হওয়া পর্যন্ত অপেক্ষা করুন)');
+    }
+    return [...p, ...validateFields(this.resolutionFields(), this.form.resolution.fields, 'প্রস্তাব: ')];
+  }
+  problems = (): string[] => {
+    const p: string[] = [];
+    if (!this.ver()) return ['কমিটির ধরন বাছাই করুন'];
+    if (!this.form.scopeNodeId) p.push('কার্যপরিধির node বাছাই করুন');
+    if (!this.form.nameBn.trim()) p.push('কমিটির নাম দিন');
+    p.push(...this.memberProblems());
+    for (const m of this.form.members) p.push(...validateFields(this.memberFields(), m.fields, `${m.name}: `));
+    p.push(...validateFields(this.committeeFields(), this.form.fields));
+    p.push(...this.resolutionProblems());
+    return p;
+  };
+
+  // ---------------- সংরক্ষণ / জমা ----------------
+  private payload(): Row {
+    return {
+      nameBn: this.form.nameBn.trim(), nameEn: this.form.nameEn.trim(), scopeNodeId: this.form.scopeNodeId,
+      members: this.form.members, fields: this.form.fields, resolution: this.form.resolution,
+    };
+  }
+  private save$(): Observable<Row> {
+    const id = this.draftId();
+    if (id) return this.api.updateDraft(id, this.payload());
+    return new Observable<Row>(sub => {
+      this.api.createDraft({
+        committeeTypeId: this.typeId, typeVersionId: this.versionId, scopeNodeId: this.form.scopeNodeId!,
+        nameBn: this.form.nameBn.trim(), nameEn: this.form.nameEn.trim(),
+      }).subscribe({
+        next: (r) => { this.draftId.set(String(r['id'] ?? r['draftId'] ?? r['committeeId'])); sub.next(r); sub.complete(); },
+        error: (e) => sub.error(e),
+      });
+    });
+  }
+  private stamp() { this.savedAt.set(new Date().toLocaleTimeString('bn-BD')); }
+
+  next() {
+    this.busy.set(true); this.err.set('');
+    this.save$().subscribe({
+      next: () => { this.busy.set(false); this.stamp(); const n = this.step() + 1; this.step.set(n); this.maxStep.set(Math.max(this.maxStep(), n)); },
+      error: (e) => { this.busy.set(false); this.err.set(errMsg(e)); },
+    });
+  }
+  saveOnly() {
+    this.busy.set(true); this.err.set('');
+    this.save$().subscribe({ next: () => { this.busy.set(false); this.stamp(); }, error: (e) => { this.busy.set(false); this.err.set(errMsg(e)); } });
+  }
+  submit() {
+    this.busy.set(true); this.err.set('');
+    this.save$().subscribe({
+      next: () => this.api.submitDraft(this.draftId()!).subscribe({
+        next: () => { this.busy.set(false); this.router.navigate(['/committee', this.draftId()]); },
+        error: (e) => { this.busy.set(false); this.err.set(errMsg(e)); },
+      }),
+      error: (e) => { this.busy.set(false); this.err.set(errMsg(e)); },
     });
   }
 }

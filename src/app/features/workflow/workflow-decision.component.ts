@@ -1,161 +1,122 @@
-import { Component, OnInit, signal } from '@angular/core';
+// D-02 / D-03 : অনুরোধের বিস্তারিত ও সিদ্ধান্ত (Approve / Reject)
+// ⚠ অনুরোধের আলাদা GET API নেই, তাই my-pending তালিকা থেকে অনুরোধটি খুঁজে দেখানো হয়
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { WorkflowService } from '../../core/services/workflow.service';
-import { ApprovalRequest } from '../../core/models/workflow.model';
+import { EngineApiService } from '../../core/services/engine-api.service';
+import { ENGINE_STYLES, Row, STATUS_BN, entries, errMsg, fmtDate, idOf, pick } from '../committee/engine-shared';
 
 @Component({
   selector: 'app-workflow-decision',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
+  styles: [ENGINE_STYLES],
   template: `
     <div class="page-container">
-      @if (loading()) { <div class="spinner"></div> }
-
-      @if (request(); as r) {
-        <div class="page-header">
-          <h1>{{ r.subjectTitleBn }}</h1>
-          <a routerLink="/workflow" class="btn btn-secondary">ফিরে যান</a>
-        </div>
-
-        @if (msg()) { <div class="alert" [class.alert-success]="msgType()==='ok'" [class.alert-danger]="msgType()==='err'">{{ msg() }}</div> }
+      <div class="page-header">
+        <div><a routerLink="/workflow" class="muted">← অনুমোদনের তালিকা</a><h1>অনুমোদনের সিদ্ধান্ত</h1></div>
+      </div>
+      @if (err()) { <div class="alert alert-err">{{ err() }}</div> }
+      @if (loading()) { <div class="empty">লোড হচ্ছে...</div> }
+      @else if (!req()) {
+        <div class="alert alert-warn">এই অনুরোধ আপনার অপেক্ষমাণ তালিকায় নেই। হয়তো আগেই সিদ্ধান্ত হয়ে গেছে বা অন্য অনুমোদনকারীর কাছে আছে।</div>
+      } @else {
+        @if (done()) { <div class="alert alert-ok">{{ done() }} <a routerLink="/workflow">তালিকায় ফিরুন</a></div> }
 
         <div class="card mb-2">
           <div class="card-header"><h3>অনুরোধের তথ্য</h3></div>
           <div class="card-body">
-            <div class="form-row">
-              <div><strong>অ্যাকশন:</strong> {{ r.actionCode }}</div>
-              <div><strong>অবস্থা:</strong> {{ r.status }}</div>
-              <div><strong>জমা:</strong> {{ r.submittedAt | date:'dd MMM yyyy HH:mm' }}</div>
-              <div><strong>বর্তমান ধাপ:</strong> {{ r.currentStepName }}</div>
-            </div>
+            <dl class="kv">@for (e of rows(); track e.k) { <dt>{{ e.label }}</dt><dd>{{ e.v }}</dd> }</dl>
+            @if (committeeId()) {
+              <p style="margin-top:12px"><a class="btn-ghost" style="text-decoration:none" [routerLink]="['/committee', committeeId()]">কমিটির পূর্ণ বিবরণ দেখুন</a></p>
+            }
           </div>
         </div>
 
-        <div class="card mb-2">
-          <div class="card-header"><h3>অনুমোদন ধাপসমূহ</h3></div>
-          <div class="card-body">
-            <div class="steps-timeline">
-              @for (s of r.steps || []; track s.id) {
-                <div class="step-item" [class.done]="s.status==='APPROVED'" [class.rejected]="s.status==='REJECTED'" [class.current]="s.status==='PENDING'">
-                  <div class="step-num">{{ s.stepOrder }}</div>
-                  <div class="step-body">
-                    <strong>{{ s.nameBn }}</strong>
-                    <span class="badge" [class]="stepBadge(s.status)">{{ s.status }}</span>
-                    @if (s.decidedAt) {
-                      <div class="text-muted" style="font-size:0.82rem">{{ s.decidedAt | date:'dd MMM yyyy HH:mm' }}</div>
-                    }
-                    @if (s.comment) {
-                      <div style="font-size:0.88rem;margin-top:4px">মন্তব্য: {{ s.comment }}</div>
-                    }
-                  </div>
-                </div>
-              }
-            </div>
-          </div>
-        </div>
+        @if (steps().length) {
+          <div class="card mb-2"><div class="card-header"><h3>অনুমোদনের ধাপ</h3></div>
+            <div class="card-body table-wrapper">
+              <table class="data-table">
+                <thead><tr><th>ধাপ</th><th>অনুমোদনকারী</th><th>অবস্থা</th><th>তারিখ</th><th>মন্তব্য</th></tr></thead>
+                <tbody>
+                  @for (s of steps(); track $index) {
+                    <tr>
+                      <td>{{ pick(s, 'levelNo', 'stepNo') ?? $index + 1 }}</td>
+                      <td>{{ pick(s, 'approverName', 'approver', 'approverRef') || '—' }}</td>
+                      <td>@if (s['status']) { <span [class]="'st st-' + s['status']">{{ bn(s['status']) }}</span> } @else { — }</td>
+                      <td>{{ fmt(pick(s, 'decidedAt', 'updatedAt')) }}</td>
+                      <td>{{ pick(s, 'comment', 'reason') || '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div></div>
+        }
 
-        @if (r.status === 'PENDING' || r.status === 'IN_PROGRESS') {
-          <div class="card">
-            <div class="card-header"><h3>সিদ্ধান্ত নিন</h3></div>
+        @if (!done()) {
+          <div class="card"><div class="card-header"><h3>আপনার সিদ্ধান্ত</h3></div>
             <div class="card-body">
+              <div class="row-actions" style="margin-bottom:12px">
+                <label class="check"><input type="radio" name="dec" value="APPROVED" [(ngModel)]="decision" /> অনুমোদন করুন (Approve)</label>
+                <label class="check"><input type="radio" name="dec" value="REJECTED" [(ngModel)]="decision" /> প্রত্যাখ্যান করুন (Reject)</label>
+              </div>
               <div class="form-group">
-                <label>মন্তব্য</label>
-                <textarea class="form-control" [(ngModel)]="comment" rows="3" placeholder="ঐচ্ছিক মন্তব্য..."></textarea>
+                <label>মন্তব্য @if (decision === 'REJECTED') { <span class="required">* (প্রত্যাখ্যানে কারণ বাধ্যতামূলক)</span> }</label>
+                <textarea class="form-control" rows="3" [(ngModel)]="comment" placeholder="কারণ বা মন্তব্য লিখুন"></textarea>
               </div>
-              <div class="form-group" *ngIf="showDelegate">
-                <label>কাউকে অর্পণ (Delegate) — User ID</label>
-                <input class="form-control" [(ngModel)]="delegateTo" placeholder="user-uuid" />
-              </div>
-              <div style="display:flex;gap:10px;flex-wrap:wrap">
-                <button class="btn btn-primary" [disabled]="submitting()" (click)="decide('APPROVE')">
-                  {{ submitting() ? '...' : '✓ অনুমোদন' }}
-                </button>
-                <button class="btn btn-danger" [disabled]="submitting()" (click)="decide('REJECT')">
-                  {{ submitting() ? '...' : '✗ প্রত্যাখ্যান' }}
-                </button>
-                <button class="btn btn-secondary" [disabled]="submitting()" (click)="showDelegate = !showDelegate">
-                  অর্পণ (Delegate)
-                </button>
-                @if (showDelegate) {
-                  <button class="btn btn-outline" [disabled]="submitting() || !delegateTo" (click)="decide('DELEGATE')">
-                    অর্পণ নিশ্চিত
-                  </button>
-                }
-              </div>
+              @if (problem()) { <div class="muted bad-text" style="margin-bottom:8px">{{ problem() }}</div> }
+              <button class="btn btn-primary" [disabled]="saving() || !!problem()" (click)="submit()">
+                {{ saving() ? 'জমা হচ্ছে...' : 'সিদ্ধান্ত জমা দিন' }}
+              </button>
+              <p class="muted" style="margin-top:8px">সিদ্ধান্ত জমা দেওয়ার পর বদলানো যাবে না।</p>
             </div>
           </div>
         }
       }
     </div>
   `,
-  styles: [`
-    .steps-timeline { display:flex; flex-direction:column; gap:12px; }
-    .step-item { display:flex; gap:14px; align-items:flex-start; padding:12px; border-radius:8px; background:#f8fbf9; }
-    .step-item.done { background:#d4edda; }
-    .step-item.rejected { background:#f8d7da; }
-    .step-item.current { background:#fff3cd; border:1.5px solid #f0b429; }
-    .step-num {
-      width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff;
-      display:flex; align-items:center; justify-content:center; font-weight:700; flex-shrink:0;
-    }
-    .step-body { flex:1; }
-  `],
 })
 export class WorkflowDecisionComponent implements OnInit {
-  request = signal<ApprovalRequest | null>(null);
-  loading = signal(true);
-  submitting = signal(false);
-  msg = signal('');
-  msgType = signal<'ok' | 'err'>('ok');
-  comment = '';
-  delegateTo = '';
-  showDelegate = false;
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private api = inject(EngineApiService);
 
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private wf: WorkflowService
-  ) {}
+  req = signal<Row | null>(null);
+  loading = signal(true); saving = signal(false);
+  err = signal(''); done = signal('');
+  decision: 'APPROVED' | 'REJECTED' | '' = '';
+  comment = '';
+  private requestId = '';
+
+  pick = pick; bn = (s: string) => STATUS_BN[s] ?? s; fmt = (v: any) => fmtDate(v, true);
+  rows = computed(() => entries(this.req()).filter(e => e.k !== 'id'));
+  steps = computed<Row[]>(() => this.req()?.['steps'] ?? []);
+  committeeId = computed<string>(() => this.req()?.['committeeId'] ?? this.req()?.['refId'] ?? '');
+  problem(): string {
+    if (!this.decision) return 'সিদ্ধান্ত বাছাই করুন।';
+    if (this.decision === 'REJECTED' && this.comment.trim().length < 5) return 'প্রত্যাখ্যানের কারণ লিখুন (কমপক্ষে ৫ অক্ষর)।';
+    return '';
+  }
 
   ngOnInit() {
-    const id = this.route.snapshot.paramMap.get('id') || '';
-    this.wf.getById(id).subscribe({
-      next: (r) => { this.request.set(r); this.loading.set(false); },
-      error: () => this.loading.set(false),
+    this.requestId = this.route.snapshot.paramMap.get('id') ?? '';
+    this.api.myPending().subscribe({
+      next: (l) => { this.req.set((l ?? []).find(r => idOf(r) === this.requestId) ?? null); this.loading.set(false); },
+      error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
     });
   }
 
-  decide(decision: 'APPROVE' | 'REJECT' | 'DELEGATE') {
-    const r = this.request();
-    if (!r) return;
-    this.submitting.set(true);
-    this.msg.set('');
-    this.wf.decide(r.id, {
-      decision,
-      comment: this.comment || undefined,
-      delegateToUserId: decision === 'DELEGATE' ? this.delegateTo : undefined,
-    }).subscribe({
+  submit() {
+    if (!this.decision) return;
+    this.saving.set(true); this.err.set('');
+    this.api.decide(this.requestId, { decision: this.decision, comment: this.comment.trim() || undefined }).subscribe({
       next: () => {
-        this.submitting.set(false);
-        this.msgType.set('ok');
-        this.msg.set(
-          decision === 'APPROVE' ? 'অনুমোদন সম্পন্ন।' :
-          decision === 'REJECT' ? 'প্রত্যাখ্যান করা হয়েছে।' : 'অর্পণ সম্পন্ন।'
-        );
-        setTimeout(() => this.router.navigate(['/workflow']), 1200);
+        this.saving.set(false);
+        this.done.set(this.decision === 'APPROVED' ? 'অনুমোদন সম্পন্ন হয়েছে।' : 'প্রত্যাখ্যান জমা হয়েছে।');
+        setTimeout(() => this.router.navigate(['/workflow']), 1500);
       },
-      error: () => {
-        this.submitting.set(false);
-        this.msgType.set('err');
-        this.msg.set('সিদ্ধান্ত সংরক্ষণ ব্যর্থ।');
-      },
+      error: (e) => { this.saving.set(false); this.err.set(errMsg(e)); },
     });
-  }
-
-  stepBadge(s: string) {
-    const m: Record<string, string> = { APPROVED: 'badge-success', REJECTED: 'badge-danger', PENDING: 'badge-warning', DELEGATED: 'badge-info' };
-    return m[s] || 'badge-secondary';
   }
 }

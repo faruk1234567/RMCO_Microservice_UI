@@ -1,70 +1,76 @@
-import { Component, OnInit, signal } from '@angular/core';
+// D-01 : অনুমোদনকারীর inbox (আমার অপেক্ষমাণ অনুরোধ)
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { WorkflowService } from '../../core/services/workflow.service';
-import { ApprovalRequest } from '../../core/models/workflow.model';
+import { EngineApiService } from '../../core/services/engine-api.service';
+import { ENGINE_STYLES, Row, STATUS_BN, errMsg, fmtDate, idOf, pick } from '../committee/engine-shared';
 
 @Component({
   selector: 'app-workflow-list',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink],
+  styles: [ENGINE_STYLES],
   template: `
     <div class="page-container">
-      <div class="page-header"><h1>অনুমোদন অনুরোধ</h1></div>
-      @if (loading()) { <div class="spinner"></div> }
-      @if (!loading()) {
-        <div class="card">
-          <div class="card-body table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr><th>বিষয়</th><th>ধরন</th><th>বর্তমান ধাপ</th><th>জমাদান</th><th>অবস্থা</th><th>অ্যাকশন</th></tr>
-              </thead>
-              <tbody>
-                @for (w of items(); track w.id) {
-                  <tr>
-                    <td>{{ w.subjectTitleBn }}</td>
-                    <td>{{ w.actionCode }}</td>
-                    <td>{{ w.currentStepName || '—' }}</td>
-                    <td>{{ w.submittedAt | date:'dd MMM yyyy' }}</td>
-                    <td><span class="badge" [class]="statusClass(w.status)">{{ statusLabel(w.status) }}</span></td>
-                    <td>
-                      @if (w.status === 'PENDING' || w.status === 'IN_PROGRESS') {
-                        <a [routerLink]="['/workflow', w.id]" class="btn btn-sm btn-primary">সিদ্ধান্ত নিন</a>
-                      } @else {
-                        <a [routerLink]="['/workflow', w.id]" class="btn btn-sm btn-secondary">দেখুন</a>
-                      }
-                    </td>
-                  </tr>
-                } @empty {
-                  <tr><td colspan="6" class="text-center text-muted">কোনো অনুরোধ নেই</td></tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-      }
+      <div class="page-header"><h1>অনুমোদনের অপেক্ষায় ({{ items().length }})</h1>
+        <button class="btn-ghost" (click)="load()">রিফ্রেশ</button></div>
+      @if (err()) { <div class="alert alert-err">{{ err() }}</div> }
+
+      <div class="toolbar">
+        <input class="form-control" style="max-width:280px" placeholder="নাম দিয়ে খুঁজুন" [ngModel]="q()" (ngModelChange)="q.set($event)" />
+        <label class="check"><input type="checkbox" [ngModel]="onlyOverdue()" (ngModelChange)="onlyOverdue.set($event)" /> শুধু সময়সীমা পেরোনো</label>
+        <span class="muted">{{ overdueCount() }}টির সময়সীমা পেরিয়েছে</span>
+      </div>
+
+      <div class="card"><div class="card-body table-wrapper">
+        @if (loading()) { <div class="empty">লোড হচ্ছে...</div> }
+        @else if (!filtered().length) { <div class="empty">আপনার সিদ্ধান্তের অপেক্ষায় কোনো অনুরোধ নেই।</div> }
+        @else {
+          <table class="data-table">
+            <thead><tr><th>বিষয়</th><th>ধাপ</th><th>অবস্থা</th><th>জমার তারিখ</th><th>সময়সীমা</th><th></th></tr></thead>
+            <tbody>
+              @for (r of filtered(); track id(r)) {
+                <tr>
+                  <td><strong>{{ title(r) }}</strong></td>
+                  <td>{{ pick(r, 'levelNo', 'stepNo', 'currentLevel') ?? '—' }}</td>
+                  <td><span [class]="'st st-' + r['status']">{{ bn(r['status']) }}</span></td>
+                  <td>{{ fmt(pick(r, 'submittedAt', 'createdAt')) }}</td>
+                  <td>
+                    {{ fmt(pick(r, 'dueAt', 'deadline')) }}
+                    @if (overdue(r)) { <span class="st st-REJECTED">সময় পেরিয়েছে</span> }
+                  </td>
+                  <td><a class="btn btn-primary btn-sm" [routerLink]="['/workflow', id(r)]">দেখুন ও সিদ্ধান্ত</a></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div></div>
     </div>
   `,
 })
 export class WorkflowListComponent implements OnInit {
-  items = signal<ApprovalRequest[]>([]);
-  loading = signal(true);
+  private api = inject(EngineApiService);
+  items = signal<Row[]>([]);
+  q = signal(''); onlyOverdue = signal(false);
+  loading = signal(true); err = signal('');
+  id = idOf; pick = pick; fmt = (v: any) => fmtDate(v, true); bn = (s: string) => STATUS_BN[s] ?? s;
 
-  constructor(private wf: WorkflowService) {}
+  title = (r: Row): string => pick(r, 'committeeName', 'nameBn', 'title', 'subject', 'entityName') ?? ('অনুরোধ #' + idOf(r).slice(0, 8));
+  overdue = (r: Row): boolean => { const d = pick(r, 'dueAt', 'deadline'); return !!d && new Date(d).getTime() < Date.now(); };
+  overdueCount = computed(() => this.items().filter(r => this.overdue(r)).length);
+  filtered = computed(() => {
+    const s = this.q().trim().toLowerCase();
+    return this.items().filter(r => (!s || this.title(r).toLowerCase().includes(s)) && (!this.onlyOverdue() || this.overdue(r)));
+  });
 
-  ngOnInit() {
-    this.wf.listPending().subscribe({
-      next: (list) => { this.items.set(list); this.loading.set(false); },
-      error: () => this.loading.set(false),
+  ngOnInit() { this.load(); }
+  load() {
+    this.loading.set(true); this.err.set('');
+    this.api.myPending().subscribe({
+      next: (l) => { this.items.set(l ?? []); this.loading.set(false); },
+      error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
     });
-  }
-
-  statusLabel(s: string) {
-    const m: Record<string, string> = { PENDING: 'অপেক্ষমাণ', IN_PROGRESS: 'চলমান', APPROVED: 'অনুমোদিত', REJECTED: 'প্রত্যাখ্যাত', CANCELLED: 'বাতিল' };
-    return m[s] || s;
-  }
-  statusClass(s: string) {
-    const m: Record<string, string> = { PENDING: 'badge-warning', IN_PROGRESS: 'badge-info', APPROVED: 'badge-success', REJECTED: 'badge-danger' };
-    return m[s] || 'badge-secondary';
   }
 }
