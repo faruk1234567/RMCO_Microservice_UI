@@ -29,7 +29,7 @@ type Tab = 'summary' | 'members' | 'resolution' | 'raw';
       @if (err()) { <div class="alert alert-err">{{ err() }}</div> }
       @if (loading()) { <div class="empty">লোড হচ্ছে...</div> }
       @else if (c()) {
-        @if (c()!['status'] === 'PENDING_APPROVAL') {
+        @if (c()!['status'] === 'SUBMITTED' || c()!['status'] === 'UNDER_APPROVAL') {
           <div class="alert alert-info">অনুমোদন চলছে। অনুমোদনকারীরা সিদ্ধান্ত দিলে অবস্থা নিজে থেকে বদলাবে।</div>
         }
         @if (c()!['status'] === 'REJECTED') {

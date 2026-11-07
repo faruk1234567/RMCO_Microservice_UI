@@ -34,7 +34,7 @@ export function validateFields(fields: DynamicField[], values: Record<string, an
           @case ('SELECT') {
             <select class="form-control" [ngModel]="values[f.key] ?? ''" (ngModelChange)="set(f.key, $event)">
               <option value="">— বাছাই করুন —</option>
-              @for (o of f.options; track o) { <option [value]="o">{{ o }}</option> }
+              @for (o of f.options; track o) { <option [value]="optVal(o)">{{ optLabel(o) }}</option> }
             </select>
           }
           @case ('BOOLEAN') { <label class="check"><input type="checkbox" [ngModel]="!!values[f.key]" (ngModelChange)="set(f.key, $event)" /> হ্যাঁ</label> }
@@ -48,6 +48,8 @@ export class DynamicFormComponent {
   @Input() fields: DynamicField[] = [];
   @Input() values: Record<string, any> = {};
   @Output() valuesChange = new EventEmitter<Record<string, any>>();
+  optVal = (o: string) => (o.includes('=') ? o.split('=')[0] : o);
+  optLabel = (o: string) => (o.includes('=') ? o.split('=').slice(1).join('=') : o);
   visible = () => this.fields.filter(f => f.showWhen !== 'ON_APPROVAL');
   set(key: string, v: any) { this.values = { ...this.values, [key]: v }; this.valuesChange.emit(this.values); }
 }

@@ -1,18 +1,31 @@
-import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
 const API = 'http://localhost:8080/identity-service/api/v1';
-const NEW = '__new__';
 
-interface Row {
-  serial?: number;
+interface GeoNode {
+  id: number;
+  category: string;
+  parentId: number | null;
+  code: string;
+  nameBn: string;
+  nameEn: string;
+  municipalityId: number | null;
+  children?: GeoNode[];
+}
+
+interface GeoRow {
+  country: string;
   division: string;
   district: string;
   upazila: string;
-  union: string;
+  local: string;
+  ward: string;
+  code: string;
+  category: string;
 }
 
 @Component({
@@ -20,308 +33,676 @@ interface Row {
   standalone: true,
   imports: [CommonModule, FormsModule],
   styles: [`
-    .search-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-    .tbl-wrap { max-height:55vh; overflow:auto; }
-    .footer-bar { display:flex; justify-content:space-between; align-items:center; margin-top:14px; }
-    .total { font-weight:600; }
-    .backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex;
-                align-items:center; justify-content:center; z-index:1000; }
-    .modal { background:#fff; border-radius:10px; width:560px; max-width:95vw; padding:22px;
-             max-height:90vh; overflow:auto; }
-    .modal h3 { margin:0 0 16px; }
-    .fld { margin-bottom:14px; }
-    .fld label { display:block; margin-bottom:4px; font-size:.85rem; }
-    .fld .form-control { width:100%; margin-bottom:6px; }
-    .actions { display:flex; justify-content:flex-end; gap:10px; margin-top:10px; }
-    @media (max-width:800px){ .search-grid{ grid-template-columns:1fr 1fr; } }
+    .page { padding: 18px; }
+    .card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .field { margin-bottom: 13px; }
+    .field label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 9px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    .table-wrap { overflow: auto; max-height: 60vh; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 9px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    th { background: #f2f4f7; position: sticky; top: 0; }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .btn {
+      border: 0;
+      padding: 9px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .primary { background: #1769aa; color: white; }
+    .secondary { background: #777; color: white; }
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 12px;
+    }
+    .modal {
+      background: white;
+      width: 650px;
+      max-width: 96vw;
+      max-height: 92vh;
+      overflow: auto;
+      border-radius: 9px;
+      padding: 22px;
+    }
+    .alert {
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 12px;
+    }
+    .danger { background: #fce8e8; color: #a40000; }
+    .success { background: #e4f5e9; color: #176b32; }
+    .muted { color: #777; font-size: 12px; }
+    @media(max-width: 800px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media(max-width: 500px) {
+      .grid { grid-template-columns: 1fr; }
+    }
   `],
   template: `
-    <div class="page-container">
-      <div class="page-header"><h1>Lookup / মাস্টার ডাটা</h1></div>
+    <div class="page">
 
-      @if (errorMsg()) { <div class="alert alert-danger">{{ errorMsg() }}</div> }
-      @if (successMsg()) {
-        <div class="alert alert-success" style="display:flex;justify-content:space-between;align-items:center">
-          <span>{{ successMsg() }}</span>
-          <button type="button" (click)="successMsg.set('')"
-                  style="background:none;border:none;font-size:1.2rem;cursor:pointer;line-height:1">&times;</button>
-        </div>
+      <h2>Geography Master Data / ভৌগোলিক মাস্টার ডাটা</h2>
+
+      @if (errorMsg()) {
+        <div class="alert danger">{{ errorMsg() }}</div>
       }
 
-      <!-- Search -->
-      <div class="card mb-2">
-        <div class="card-body">
-          <div class="search-grid">
-            <div class="form-group"><label>ডিভিশন</label>
-              <input class="form-control" placeholder="ডিভিশন খুঁজুন" [ngModel]="fDiv()" (ngModelChange)="fDiv.set($event)" /></div>
-            <div class="form-group"><label>জেলা</label>
-              <input class="form-control" placeholder="জেলা খুঁজুন" [ngModel]="fDis()" (ngModelChange)="fDis.set($event)" /></div>
-            <div class="form-group"><label>উপজেলা</label>
-              <input class="form-control" placeholder="উপজেলা খুঁজুন" [ngModel]="fUpa()" (ngModelChange)="fUpa.set($event)" /></div>
-            <div class="form-group"><label>ইউনিয়ন</label>
-              <input class="form-control" placeholder="ইউনিয়ন খুঁজুন" [ngModel]="fUni()" (ngModelChange)="fUni.set($event)" /></div>
-          </div>
-        </div>
-      </div>
+      @if (successMsg()) {
+        <div class="alert success">{{ successMsg() }}</div>
+      }
 
-      <!-- Table -->
       <div class="card">
-        <div class="card-body">
-          <div class="tbl-wrap table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th style="width:70px">ক্রমিক</th>
-                  <th>ডিভিশন</th>
-                  <th>জেলা</th>
-                  <th>উপজেলা</th>
-                  <th>ইউনিয়ন</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (r of filtered(); track $index) {
-                  <tr>
-                    <td>{{ $index + 1 }}</td>
-                    <td>{{ r.division || '—' }}</td>
-                    <td>{{ r.district || '—' }}</td>
-                    <td>{{ r.upazila || '—' }}</td>
-                    <td>{{ r.union || '—' }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-            @if (loading()) { <p style="padding:12px">লোড হচ্ছে...</p> }
-            @if (!loading() && !filtered().length) { <p style="padding:12px">কোনো ডাটা পাওয়া যায়নি।</p> }
+        <h3>Search Geography</h3>
+
+        <div class="grid">
+          <div class="field">
+            <label>Division</label>
+            <input [(ngModel)]="searchDivision"
+                   placeholder="Search Division">
           </div>
 
-          <div class="footer-bar">
-            <span class="total">মোট: {{ filtered().length }}</span>
-            <button class="btn btn-primary" (click)="openForm()">+ অ্যাড লুকআপ ডাটা</button>
+          <div class="field">
+            <label>District</label>
+            <input [(ngModel)]="searchDistrict"
+                   placeholder="Search District">
+          </div>
+
+          <div class="field">
+            <label>Upazila</label>
+            <input [(ngModel)]="searchUpazila"
+                   placeholder="Search Upazila">
+          </div>
+
+          <div class="field">
+            <label>Union / Paurashava / City Corporation</label>
+            <input [(ngModel)]="searchLocal"
+                   placeholder="Search local body">
+          </div>
+
+          <div class="field">
+            <label>Ward</label>
+            <input [(ngModel)]="searchWard"
+                   placeholder="Search Ward">
           </div>
         </div>
       </div>
 
-      <!-- Add form -->
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Division</th>
+                <th>District</th>
+                <th>Upazila</th>
+                <th>Union / Paurashava / City Corporation</th>
+                <th>Ward</th>
+                <th>Code</th>
+                <th>Category</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              @for (r of filteredRows(); track $index) {
+                <tr>
+                  <td>{{ $index + 1 }}</td>
+                  <td>{{ r.division || '—' }}</td>
+                  <td>{{ r.district || '—' }}</td>
+                  <td>{{ r.upazila || '—' }}</td>
+                  <td>{{ r.local || '—' }}</td>
+                  <td>{{ r.ward || '—' }}</td>
+                  <td>{{ r.code }}</td>
+                  <td>{{ r.category }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+
+          @if (loading()) {
+            <p>Loading Geography data...</p>
+          }
+
+          @if (!loading() && filteredRows().length === 0) {
+            <p>No Geography data found.</p>
+          }
+        </div>
+
+        <div class="actions">
+          <strong>মোট: {{ filteredRows().length }}</strong>
+          <button class="btn primary" (click)="openForm()">
+            + নতুন Geography Data
+          </button>
+        </div>
+      </div>
+
       @if (showForm()) {
-        <div class="backdrop" (click)="closeForm()">
-          <div class="modal" (click)="$event.stopPropagation()">
-            <h3>নতুন লুকআপ ডাটা</h3>
+        <div class="backdrop">
+          <div class="modal">
 
-            <div class="fld">
-              <label>ডিভিশন</label>
-              <select class="form-control" [(ngModel)]="selDiv" (ngModelChange)="selDis=''; selUpa=''">
-                <option value="">-- নির্বাচন করুন --</option>
-                @for (d of divisions(); track d.id) { <option [value]="d.id">{{ name(d) }}</option> }
-                <option [value]="NEW">+ নতুন ডিভিশন</option>
+            <h3>নতুন Geography Record তৈরি</h3>
+
+            <div class="field">
+              <label>Category নির্বাচন করুন *</label>
+              <select [(ngModel)]="category"
+                      (ngModelChange)="onCategoryChange()">
+                <option value="">-- Category নির্বাচন করুন --</option>
+                <option value="DIVISION">Division</option>
+                <option value="DISTRICT">District</option>
+                <option value="UPAZILA">Upazila</option>
+                <option value="UNION">Union</option>
+                <option value="PAURASAVA">Paurashava</option>
+                <option value="CITY_CORPORATION">City Corporation</option>
+                <option value="WARD">Ward</option>
               </select>
-              @if (selDiv === NEW) {
-                <input class="form-control" placeholder="নতুন ডিভিশনের নাম (বাংলা)" [(ngModel)]="nDiv" />
-                <input class="form-control" placeholder="Division name (English)" [(ngModel)]="eDiv" />
-              }
             </div>
 
-            <div class="fld">
-              <label>জেলা</label>
-              <select class="form-control" [(ngModel)]="selDis" (ngModelChange)="selUpa=''" [disabled]="!selDiv">
-                <option value="">-- নির্বাচন করুন --</option>
-                @for (d of districts(); track d.id) { <option [value]="d.id">{{ name(d) }}</option> }
-                @if (selDiv) { <option [value]="NEW">+ নতুন জেলা</option> }
+            <hr>
+
+            <h4>Parent Selection / Cascade</h4>
+
+            <div class="field">
+              <label>Country *</label>
+              <select [(ngModel)]="countryId"
+                      (ngModelChange)="onCountryChange()">
+                <option value="">-- Country নির্বাচন করুন --</option>
+                @for (c of countries(); track c.id) {
+                  <option [value]="c.id">{{ displayName(c) }}</option>
+                }
               </select>
-              @if (selDis === NEW) {
-                <input class="form-control" placeholder="নতুন জেলার নাম (বাংলা)" [(ngModel)]="nDis" />
-                <input class="form-control" placeholder="District name (English)" [(ngModel)]="eDis" />
-              }
             </div>
 
-            <div class="fld">
-              <label>উপজেলা</label>
-              <select class="form-control" [(ngModel)]="selUpa" [disabled]="!selDis">
-                <option value="">-- নির্বাচন করুন --</option>
-                @for (d of upazilas(); track d.id) { <option [value]="d.id">{{ name(d) }}</option> }
-                @if (selDis) { <option [value]="NEW">+ নতুন উপজেলা</option> }
-              </select>
-              @if (selUpa === NEW) {
-                <input class="form-control" placeholder="নতুন উপজেলার নাম (বাংলা)" [(ngModel)]="nUpa" />
-                <input class="form-control" placeholder="Upazila name (English)" [(ngModel)]="eUpa" />
-              }
+            @if (needsDivision()) {
+              <div class="field">
+                <label>Division *</label>
+                <select [(ngModel)]="divisionId"
+                        (ngModelChange)="onDivisionChange()">
+                  <option value="">-- Division নির্বাচন করুন --</option>
+                  @for (d of divisions(); track d.id) {
+                    <option [value]="d.id">{{ displayName(d) }}</option>
+                  }
+                </select>
+              </div>
+            }
+
+            @if (needsDistrict()) {
+              <div class="field">
+                <label>District *</label>
+                <select [(ngModel)]="districtId"
+                        (ngModelChange)="onDistrictChange()">
+                  <option value="">-- District নির্বাচন করুন --</option>
+                  @for (d of districts(); track d.id) {
+                    <option [value]="d.id">{{ displayName(d) }}</option>
+                  }
+                </select>
+              </div>
+            }
+
+            @if (needsUpazila()) {
+              <div class="field">
+                <label>Upazila / Thana *</label>
+                <select [(ngModel)]="upazilaId"
+                        (ngModelChange)="onUpazilaChange()">
+                  <option value="">-- Upazila নির্বাচন করুন --</option>
+                  @for (u of upazilas(); track u.id) {
+                    <option [value]="u.id">{{ displayName(u) }}</option>
+                  }
+                </select>
+              </div>
+            }
+
+            @if (needsLocalParent()) {
+              <div class="field">
+                <label>Union / Paurashava / City Corporation *</label>
+                <select [(ngModel)]="localParentId">
+                  <option value="">-- Parent নির্বাচন করুন --</option>
+                  @for (p of localParents(); track p.id) {
+                    <option [value]="p.id">
+                      {{ p.category }} - {{ displayName(p) }}
+                    </option>
+                  }
+                </select>
+              </div>
+            }
+
+            <hr>
+
+            <h4>New Record Information</h4>
+
+            <div class="field">
+              <label>Code * (নিজে লিখুন)</label>
+              <input [(ngModel)]="code"
+                     placeholder="যেমন: 55 / 27 / 10 / 01">
             </div>
 
-            <div class="fld">
-              <label>ইউনিয়ন (ঐচ্ছিক)</label>
-              <input class="form-control" placeholder="ইউনিয়নের নাম (বাংলা)" [(ngModel)]="nUni" [disabled]="!selUpa" />
-              <input class="form-control" placeholder="Union name (English)" [(ngModel)]="eUni" [disabled]="!selUpa" />
+            <div class="field">
+              <label>বাংলা নাম *</label>
+              <input [(ngModel)]="nameBn"
+                     placeholder="বাংলা নাম লিখুন">
+            </div>
+
+            <div class="field">
+              <label>English Name *</label>
+              <input [(ngModel)]="nameEn"
+                     placeholder="Enter English name">
+            </div>
+
+            <div class="field">
+              <label>Sort Order</label>
+              <input type="number" [(ngModel)]="sortOrder">
             </div>
 
             <div class="actions">
-              <button class="btn btn-secondary" (click)="closeForm()" [disabled]="saving()">বাতিল</button>
-              <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
+              <button class="btn secondary"
+                      (click)="closeForm()"
+                      [disabled]="saving()">
+                বাতিল
+              </button>
+
+              <button class="btn primary"
+                      (click)="save()"
+                      [disabled]="saving()">
                 {{ saving() ? 'সেভ হচ্ছে...' : 'সেভ করুন' }}
               </button>
             </div>
+
           </div>
         </div>
       }
-    </div>
-  `,
-})
-export class LookupComponent implements OnInit, OnDestroy {
-  readonly NEW = NEW;
 
-  tree = signal<any[]>([]);
+    </div>
+  `
+})
+export class LookupComponent implements OnInit {
+
+  countries = signal<GeoNode[]>([]);
+  tree = signal<GeoNode[]>([]);
+
   loading = signal(false);
   saving = signal(false);
   showForm = signal(false);
+
   errorMsg = signal('');
   successMsg = signal('');
 
-  // search filters
-  fDiv = signal(''); fDis = signal(''); fUpa = signal(''); fUni = signal('');
+  category = '';
+  countryId = '';
+  divisionId = '';
+  districtId = '';
+  upazilaId = '';
+  localParentId = '';
 
-  // form state
-  selDiv = ''; selDis = ''; selUpa = '';
-  nDiv = ''; nDis = ''; nUpa = ''; nUni = '';
-  eDiv = ''; eDis = ''; eUpa = ''; eUni = '';
+  code = '';
+  nameBn = '';
+  nameEn = '';
+  sortOrder = 0;
+
+  searchDivision = '';
+  searchDistrict = '';
+  searchUpazila = '';
+  searchLocal = '';
+  searchWard = '';
 
   constructor(private http: HttpClient) {}
 
-  private msgTimer: any;
-
-  ngOnInit() { this.loadTree(); }
-
-  ngOnDestroy() { clearTimeout(this.msgTimer); }
-
-  private flashSuccess(msg: string) {
-    clearTimeout(this.msgTimer);
-    this.successMsg.set(msg);
-    this.msgTimer = setTimeout(() => this.successMsg.set(''), 4000);
+  ngOnInit(): void {
+    this.loadCountries();
+    this.loadTree();
   }
 
-  // ---------- helpers ----------
-  name(n: any): string {
-    return n?.nameBn || n?.name_bn || n?.name || n?.nameEn || n?.name_en || '';
-  }
-  private kids(n: any): any[] {
-    return n?.children || n?.child || n?.items || [];
+  private unwrap(res: any): any[] {
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.content)) return res.content;
+    return [];
   }
 
-  // ---------- data ----------
-  loadTree() {
-    this.loading.set(true);
-    this.errorMsg.set('');
-    this.http.get<any>(`${API}/lookups/geo-tree`, { params: { _t: Date.now() } }).subscribe({
-      next: (res) => {
-        const list = Array.isArray(res) ? res : res?.data || res?.content || res?.items || [];
-        this.tree.set(list);
-        console.log('geo-tree', list);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        this.loading.set(false);
-        this.errorMsg.set((err?.error?.message || 'ডাটা লোড ব্যর্থ।') + ' (HTTP ' + err?.status + ')');
-      },
+  displayName(item: GeoNode): string {
+    return item.nameBn || item.nameEn || '';
+  }
+
+  loadCountries(): void {
+    this.http.get<any>(`${API}/lookups/COUNTRY`).subscribe({
+      next: res => this.countries.set(this.unwrap(res)),
+      error: err => this.showError(err, 'Country load failed')
     });
   }
 
-  // flatten tree -> rows
-  rows = computed<Row[]>(() => {
-    const out: Row[] = [];
-    for (const dv of this.tree()) {
-      const dvN = this.name(dv);
-      const dsList = this.kids(dv);
-      if (!dsList.length) { out.push({ division: dvN, district: '', upazila: '', union: '' }); continue; }
-      for (const ds of dsList) {
-        const dsN = this.name(ds);
-        const upList = this.kids(ds);
-        if (!upList.length) { out.push({ division: dvN, district: dsN, upazila: '', union: '' }); continue; }
-        for (const up of upList) {
-          const upN = this.name(up);
-          const unList = this.kids(up);
-          if (!unList.length) { out.push({ division: dvN, district: dsN, upazila: upN, union: '' }); continue; }
-          for (const un of unList) {
-            out.push({ division: dvN, district: dsN, upazila: upN, union: this.name(un) });
-          }
-        }
+  loadTree(): void {
+    this.loading.set(true);
+
+    this.http.get<any>(`${API}/lookups/geo-tree`).subscribe({
+      next: res => {
+        this.tree.set(this.unwrap(res));
+        this.loading.set(false);
+      },
+      error: err => {
+        this.loading.set(false);
+        this.showError(err, 'Geography load failed');
       }
-    }
-    return out;
-  });
+    });
+  }
 
-  filtered = computed<Row[]>(() => {
-    const m = (v: string, q: string) => !q.trim() || v.toLowerCase().includes(q.trim().toLowerCase());
-    const a = this.fDiv(), b = this.fDis(), c = this.fUpa(), d = this.fUni();
-    return this.rows().filter(
-      (r) => m(r.division, a) && m(r.district, b) && m(r.upazila, c) && m(r.union, d)
+  private showError(err: any, fallback: string): void {
+    this.errorMsg.set(
+      err?.error?.message || fallback + ' (HTTP ' + err?.status + ')'
     );
-  });
-
-  // ---------- form dropdown lists ----------
-  divisions = computed(() => this.tree());
-  districts() {
-    const dv = this.tree().find((x) => String(x.id) === this.selDiv);
-    return dv ? this.kids(dv) : [];
-  }
-  upazilas() {
-    const dv = this.tree().find((x) => String(x.id) === this.selDiv);
-    const ds = dv ? this.kids(dv).find((x: any) => String(x.id) === this.selDis) : null;
-    return ds ? this.kids(ds) : [];
   }
 
-  openForm() {
-    this.selDiv = this.selDis = this.selUpa = '';
-    this.nDiv = this.nDis = this.nUpa = this.nUni = '';
-    this.eDiv = this.eDis = this.eUpa = this.eUni = '';
+  private allNodes(): GeoNode[] {
+    const result: GeoNode[] = [];
+
+    const visit = (nodes: GeoNode[]) => {
+      for (const node of nodes) {
+        result.push(node);
+        if (node.children?.length) visit(node.children);
+      }
+    };
+
+    visit(this.tree());
+    return result;
+  }
+
+  private findNode(id: string): GeoNode | undefined {
+    return this.allNodes().find(n => String(n.id) === String(id));
+  }
+
+  divisions(): GeoNode[] {
+    return this.tree().filter(d =>
+      String(d.parentId) === String(this.countryId)
+    );
+  }
+
+  districts(): GeoNode[] {
+    return this.findNode(this.divisionId)?.children
+      ?.filter(n => n.category === 'DISTRICT') || [];
+  }
+
+  upazilas(): GeoNode[] {
+    return this.findNode(this.districtId)?.children
+      ?.filter(n => n.category === 'UPAZILA') || [];
+  }
+
+  localParents(): GeoNode[] {
+    const allowed = ['UNION', 'PAURASAVA', 'CITY_CORPORATION'];
+
+    return this.findNode(this.upazilaId)?.children
+      ?.filter(n => allowed.includes(n.category)) || [];
+  }
+
+  needsDivision(): boolean {
+    return ['DISTRICT', 'UPAZILA', 'UNION',
+      'PAURASAVA', 'CITY_CORPORATION', 'WARD'].includes(this.category);
+  }
+
+  needsDistrict(): boolean {
+    return ['UPAZILA', 'UNION', 'PAURASAVA',
+      'CITY_CORPORATION', 'WARD'].includes(this.category);
+  }
+
+  needsUpazila(): boolean {
+    return ['UNION', 'PAURASAVA',
+      'CITY_CORPORATION', 'WARD'].includes(this.category);
+  }
+
+  needsLocalParent(): boolean {
+    return this.category === 'WARD';
+  }
+
+  onCategoryChange(): void {
+    this.resetCascade();
+  }
+
+  onCountryChange(): void {
+    this.divisionId = '';
+    this.districtId = '';
+    this.upazilaId = '';
+    this.localParentId = '';
+  }
+
+  onDivisionChange(): void {
+    this.districtId = '';
+    this.upazilaId = '';
+    this.localParentId = '';
+  }
+
+  onDistrictChange(): void {
+    this.upazilaId = '';
+    this.localParentId = '';
+  }
+
+  onUpazilaChange(): void {
+    this.localParentId = '';
+  }
+
+  private resetCascade(): void {
+    this.countryId = '';
+    this.divisionId = '';
+    this.districtId = '';
+    this.upazilaId = '';
+    this.localParentId = '';
+  }
+
+  openForm(): void {
+    this.resetCascade();
+
+    this.category = '';
+    this.code = '';
+    this.nameBn = '';
+    this.nameEn = '';
+    this.sortOrder = 0;
+
     this.errorMsg.set('');
-    this.successMsg.set('');
     this.showForm.set(true);
   }
-  closeForm() { if (!this.saving()) this.showForm.set(false); }
 
-  // ---------- save ----------
-  private async create(category: string, nameBn: string, nameEn: string, parentId: string | null): Promise<string> {
-    // TODO: আপনার POST API অনুযায়ী URL/body মিলিয়ে নিন
-    const slug = nameEn.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
-    const code = slug || (category + '_' + Date.now().toString(36)).toUpperCase();
-    const body: any = { category, code, nameBn, nameEn: nameEn.trim(), parentId, sortOrder: 0, isActive: true };
-    const res: any = await firstValueFrom(this.http.post(`${API}/lookups`, body));
-    return String(res?.id ?? res?.data?.id ?? '');
+  closeForm(): void {
+    if (!this.saving()) this.showForm.set(false);
   }
 
-  async save() {
+  private getParentId(): number | null {
+    switch (this.category) {
+      case 'DIVISION':
+        return Number(this.countryId);
+
+      case 'DISTRICT':
+        return Number(this.divisionId);
+
+      case 'UPAZILA':
+        return Number(this.districtId);
+
+      case 'UNION':
+      case 'PAURASAVA':
+      case 'CITY_CORPORATION':
+        return Number(this.upazilaId);
+
+      case 'WARD':
+        return Number(this.localParentId);
+
+      default:
+        return null;
+    }
+  }
+
+  async save(): Promise<void> {
     this.errorMsg.set('');
-    if (!this.selDiv || (this.selDiv === NEW && !this.nDiv.trim())) {
-      this.errorMsg.set('ডিভিশন দিন।'); return;
+
+    if (!this.category) {
+      this.errorMsg.set('Category নির্বাচন করুন।');
+      return;
     }
-    if (this.selDiv === NEW && !this.eDiv.trim()) { this.errorMsg.set('ডিভিশনের ইংরেজি নাম দিন।'); return; }
-    if (!this.selDis || (this.selDis === NEW && !this.nDis.trim())) {
-      this.errorMsg.set('জেলা দিন।'); return;
+
+    if (!this.countryId) {
+      this.errorMsg.set('Country নির্বাচন করুন।');
+      return;
     }
-    if (this.selDis === NEW && !this.eDis.trim()) { this.errorMsg.set('জেলার ইংরেজি নাম দিন।'); return; }
-    if (!this.selUpa || (this.selUpa === NEW && !this.nUpa.trim())) {
-      this.errorMsg.set('উপজেলা দিন।'); return;
+
+    if (this.needsDivision() && !this.divisionId) {
+      this.errorMsg.set('Division নির্বাচন করুন।');
+      return;
     }
-    if (this.selUpa === NEW && !this.eUpa.trim()) { this.errorMsg.set('উপজেলার ইংরেজি নাম দিন।'); return; }
-    if (this.nUni.trim() && !this.eUni.trim()) { this.errorMsg.set('ইউনিয়নের ইংরেজি নাম দিন।'); return; }
+
+    if (this.needsDistrict() && !this.districtId) {
+      this.errorMsg.set('District নির্বাচন করুন।');
+      return;
+    }
+
+    if (this.needsUpazila() && !this.upazilaId) {
+      this.errorMsg.set('Upazila নির্বাচন করুন।');
+      return;
+    }
+
+    if (this.needsLocalParent() && !this.localParentId) {
+      this.errorMsg.set('Ward-এর Parent নির্বাচন করুন।');
+      return;
+    }
+
+    if (!this.code.trim() || !this.nameBn.trim() || !this.nameEn.trim()) {
+      this.errorMsg.set('Code, বাংলা নাম এবং English Name দিতে হবে।');
+      return;
+    }
+
+    const parentId = this.getParentId();
+
+    if (!parentId) {
+      this.errorMsg.set('সঠিক Parent নির্বাচন করুন।');
+      return;
+    }
+
+    const body = {
+      category: this.category,
+      municipalityId: null,
+      parentId,
+      code: this.code.trim().toUpperCase(),
+      nameBn: this.nameBn.trim(),
+      nameEn: this.nameEn.trim(),
+      sortOrder: Number(this.sortOrder) || 0
+    };
 
     this.saving.set(true);
+
     try {
-      let divId = this.selDiv;
-      if (divId === NEW) divId = await this.create('DIVISION', this.nDiv.trim(), this.eDiv, null);
+      await firstValueFrom(
+        this.http.post(`${API}/lookups`, body)
+      );
 
-      let disId = this.selDis;
-      if (disId === NEW) disId = await this.create('DISTRICT', this.nDis.trim(), this.eDis, divId);
-
-      let upaId = this.selUpa;
-      if (upaId === NEW) upaId = await this.create('UPAZILA', this.nUpa.trim(), this.eUpa, disId);
-
-      if (this.nUni.trim()) await this.create('UNION', this.nUni.trim(), this.eUni, upaId);
-
-      this.saving.set(false);
       this.showForm.set(false);
-      this.flashSuccess('সফলভাবে সেভ হয়েছে।');
-      this.loadTree(); // আগের পেজে আবার ডাটা লোড
+      this.successMsg.set('Geography record সফলভাবে সংরক্ষিত হয়েছে।');
+      this.loadTree();
+
     } catch (err: any) {
+      this.showError(err, 'Geography save failed');
+    } finally {
       this.saving.set(false);
-      this.errorMsg.set(err?.error?.message || 'সেভ ব্যর্থ।');
     }
   }
+
+  rows = computed<GeoRow[]>(() => {
+    const result: GeoRow[] = [];
+
+    const visit = (
+      nodes: GeoNode[],
+      path: Partial<GeoRow>
+    ): void => {
+      for (const node of nodes) {
+        const next: Partial<GeoRow> = { ...path };
+
+        switch (node.category) {
+          case 'COUNTRY':
+            next.country = this.displayName(node);
+            break;
+          case 'DIVISION':
+            next.division = this.displayName(node);
+            break;
+          case 'DISTRICT':
+            next.district = this.displayName(node);
+            break;
+          case 'UPAZILA':
+            next.upazila = this.displayName(node);
+            break;
+          case 'UNION':
+          case 'PAURASAVA':
+          case 'CITY_CORPORATION':
+            next.local = this.displayName(node);
+            break;
+          case 'WARD':
+            next.ward = this.displayName(node);
+            break;
+        }
+
+        next.code = node.code;
+        next.category = node.category;
+
+        result.push({
+          country: next.country || '',
+          division: next.division || '',
+          district: next.district || '',
+          upazila: next.upazila || '',
+          local: next.local || '',
+          ward: next.ward || '',
+          code: node.code,
+          category: node.category
+        });
+
+        if (node.children?.length) {
+          visit(node.children, next);
+        }
+      }
+    };
+
+    visit(this.tree(), {});
+    return result;
+  });
+
+  filteredRows = computed(() => {
+    const contains = (value: string, query: string) =>
+      !query.trim()
+      || value.toLowerCase().includes(query.trim().toLowerCase());
+
+    return this.rows().filter(r =>
+      contains(r.division, this.searchDivision) &&
+      contains(r.district, this.searchDistrict) &&
+      contains(r.upazila, this.searchUpazila) &&
+      contains(r.local, this.searchLocal) &&
+      contains(r.ward, this.searchWard)
+    );
+  });
 }

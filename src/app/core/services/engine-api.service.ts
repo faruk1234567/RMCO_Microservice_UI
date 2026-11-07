@@ -29,9 +29,24 @@ export class EngineApiService {
   }
   getCommittee(id: string): Observable<Row> { return this.http.get(this.committeeApi(`/committees/${id}`)).pipe(unwrap()); }
   /** ⚠ CreateDraftRequest-এর field-নাম অনুমান */
-  createDraft(body: { committeeTypeId: string; typeVersionId: string; scopeNodeId: string; nameBn: string; nameEn?: string }): Observable<Row> {
-    return this.http.post(this.committeeApi('/committees/drafts'), body).pipe(unwrap());
-  }
+  createDraft(body: {
+  typeVersionId: string;
+  payload: {
+    code: string;
+    nameBn: string;
+    nameEn?: string;
+    scopeNodeId: string | null;
+    termStart: string;
+    termEnd: string;
+    dynamicValues: Record<string, any>;
+    members: any[];
+    documents: any[];
+  };
+}): Observable<any> {
+  return this.http
+    .post(this.committeeApi('/committees/drafts'), body)
+    .pipe(unwrap());
+}
   updateDraft(id: string, payload: Row): Observable<Row> { return this.http.put(this.committeeApi(`/committees/drafts/${id}`), payload).pipe(unwrap()); }
   submitDraft(id: string): Observable<Row> { return this.http.post(this.committeeApi(`/committees/drafts/${id}/submit`), {}).pipe(unwrap()); }
 

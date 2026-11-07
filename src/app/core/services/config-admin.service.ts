@@ -17,7 +17,7 @@ function unwrap<T>(): OperatorFunction<any, T> {
 @Injectable({ providedIn: 'root' })
 export class ConfigAdminService {
   private http = inject(HttpClient);
- private base = environment.configUrl;         // ← প্রয়োজনে বদলান
+  private base = environment.configUrl;        // '/config-service/api/v1'
   private url = (p: string) => `${this.base}${p}`;
 
   // ---------------- B-01 / B-02 / B-03 : Committee type ----------------

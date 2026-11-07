@@ -1,15 +1,9 @@
-
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap, catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import {
-  AppUser,
-  LoginRequest,
-  LoginResponse,
-  Municipality,
-} from '../models/user.model';
+import { AppUser } from '../models/user.model';
 
 const TOKEN_KEY = 'dms_access_token';
 const USER_KEY = 'dms_user';
@@ -20,9 +14,7 @@ export class AuthService {
   private base = environment.identityUrl;
 
   private currentUserSignal = signal<AppUser | null>(this.loadUser());
-  private tokenSignal = signal<string | null>(
-    localStorage.getItem(TOKEN_KEY)
-  );
+  private tokenSignal = signal<string | null>(localStorage.getItem(TOKEN_KEY));
 
   readonly currentUser = this.currentUserSignal.asReadonly();
 
@@ -39,10 +31,7 @@ export class AuthService {
     ) as 'BN' | 'EN';
   });
 
-  constructor(
-    private http: HttpClient,
-    private router: Router
-  ) {}
+  constructor(private http: HttpClient, private router: Router) {}
 
   private loadUser(): AppUser | null {
     try {
@@ -78,189 +67,157 @@ export class AuthService {
     municipalityId: string;
   }): Observable<any> {
     return this.http
-      .post<any>(
-        `${this.base}/auth/login/select-municipality`,
-        payload
-      )
+      .post<any>(`${this.base}/auth/login/select-municipality`, payload)
       .pipe(
-       tap((res) => {
-  const data = res?.data ?? res;
-
-  console.log('FULL PLATFORM LOGIN RESPONSE:', res);
-  console.log('RESPONSE DATA:', data);
-  console.log('ROLES:', data?.roles);
-  console.log('ROLE NAMES:', data?.roleNames);
-
-  this.handleLoginResponse(res);
-
-  console.log('SAVED USER:', this.currentUserSignal());
-  console.log(
-    'IS PLATFORM ADMIN:',
-    this.hasRole('PLATFORM_ADMIN')
-  );
-}),
+        tap((res) => this.handleLoginResponse(res)),
         catchError((err) => throwError(() => err))
       );
   }
-  
-/**
- * POST /auth/context/municipality
- * Switch Global Citizen to a Municipality Context.
- */
-selectMunicipalityContext(municipalityId: number): Observable<any> {
-  return this.http
-    .post<any>(`${this.base}/auth/context/municipality`, {
-      municipalityId,
-    })
-    .pipe(
-      tap((res) => {
-        const data = res?.data ?? res;
 
-        const token =
-          data?.accessToken ??
-          data?.access_token ??
-          data?.token;
+  /**
+   * POST /auth/context/municipality
+   * Switch Global Citizen to a Municipality Context.
+   */
+  selectMunicipalityContext(municipalityId: number): Observable<any> {
+    return this.http
+      .post<any>(`${this.base}/auth/context/municipality`, { municipalityId })
+      .pipe(
+        tap((res) => {
+          const data = res?.data ?? res;
 
-        if (!token) {
-          throw new Error('Municipality context token not found');
-        }
+          const token =
+            data?.accessToken ?? data?.access_token ?? data?.token;
 
-        const currentUser = this.currentUserSignal();
+          if (!token) {
+            throw new Error('Municipality context token not found');
+          }
 
-        if (!currentUser) {
-          throw new Error('Current user not found');
-        }
+          const currentUser = this.currentUserSignal();
+          if (!currentUser) {
+            throw new Error('Current user not found');
+          }
 
-        // Preserve existing user information and roles.
-        const updatedUser: AppUser = {
-          ...currentUser,
-          municipalityId: data?.municipalityId ?? municipalityId,
-          nameBn: data?.nameBn ?? currentUser.nameBn,
-          nameEn: data?.nameEn ?? currentUser.nameEn,
-        };
+          // নতুন token-এ permission এলে সেটা নেবে, না এলে আগেরটা রাখবে
+          const newPerms = this.extractPermissions(data);
 
-        // Replace Global Login Token with Context Token.
-        localStorage.setItem(TOKEN_KEY, token);
-        localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+          const updatedUser: AppUser = {
+            ...currentUser,
+            municipalityId: data?.municipalityId ?? municipalityId,
+            nameBn: data?.nameBn ?? currentUser.nameBn,
+            nameEn: data?.nameEn ?? currentUser.nameEn,
+            permissions: newPerms.length
+              ? newPerms
+              : currentUser.permissions ?? [],
+          };
 
-        this.tokenSignal.set(token);
-        this.currentUserSignal.set(updatedUser);
+          localStorage.setItem(TOKEN_KEY, token);
+          localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
 
-        console.log('Municipality Context Activated:', {
-          municipalityId: updatedUser.municipalityId,
-          userId: updatedUser.id,
-        });
-      }),
-      catchError((err) => throwError(() => err))
-    );
-}
-
-
-  /** POST /platform/auth/login */
-
-platformLogin(req: {
-  loginId: string;
-  password: string;
-  deviceLabel?: string;
-}): Observable<any> {
-  const body = {
-    identifier: req.loginId,
-    password: req.password,
-    deviceLabel: req.deviceLabel || 'web',
-  };
-
-  console.log('PLATFORM LOGIN URL:', `${this.base}/platform/auth/login`);
-
-  return this.http
-    .post<any>(`${this.base}/platform/auth/login`, body)
-    .pipe(
-     tap((res) => {
-  console.log('PLATFORM LOGIN FULL RESPONSE:', res);
-
-  const data = res?.data ?? res;
-
-  console.log('PLATFORM LOGIN DATA:', data);
-  console.log('RAW RESPONSE:', JSON.stringify(res, null, 2));
-  console.log('DATA ROLES:', data?.roles);
-  console.log('DATA KEYS:', Object.keys(data ?? {}));
-
-  this.handleLoginResponse(res);
-
-  console.log(
-    'USER AFTER HANDLE:',
-    this.currentUserSignal()
-  );
-
-  console.log(
-    'SAVED ROLES:',
-    this.currentUserSignal()?.roles
-  );
-}),
-      catchError((err) => {
-        console.error('PLATFORM LOGIN ERROR:', err);
-        return throwError(() => err);
-      })
-    );
-}
-
- 
-private handleLoginResponse(res: any): void {
-  console.log('FULL RES JSON:', JSON.stringify(res, null, 2));
-console.log('RES TYPE:', typeof res);
-console.log('RES KEYS:', Object.keys(res ?? {}));
-  const data = res?.data ?? res;
-
-  const token =
-    data?.accessToken ??
-    data?.access_token ??
-    data?.token ??
-    res?.accessToken ??
-    res?.access_token ??
-    res?.token;
-
-  const id = data?.userId ?? data?.user_id ?? data?.id;
-
-  const rolesRaw = data?.roles ?? data?.roleNames ?? [];
-
-  const roles: string[] = Array.isArray(rolesRaw)
-    ? rolesRaw.map((role: any) =>
-        typeof role === 'string'
-          ? role
-          : role?.code ?? role?.name ?? String(role)
-      )
-    : typeof rolesRaw === 'string'
-      ? [rolesRaw]
-      : [];
-
-  if (!token || !id) {
-    console.error('Login response missing token or user ID:', {
-      hasToken: !!token,
-      hasUserId: !!id,
-      roles
-    });
-    return;
+          this.tokenSignal.set(token);
+          this.currentUserSignal.set(updatedUser);
+        }),
+        catchError((err) => throwError(() => err))
+      );
   }
 
-  const mapped: AppUser = {
-    id: String(id),
-    municipalityId: data?.municipalityId ?? null,
-    mobileNormalized: data?.mobile ?? '',
-    emailNormalized: data?.email ?? '',
-    nameBn: data?.nameBn ?? 'Admin',
-    nameEn: data?.nameEn ?? 'Admin',
-    status: data?.status ?? 'ACTIVE',
-    roles,
-    formLanguage: 'BN',
-  };
+  /** POST /platform/auth/login */
+  platformLogin(req: {
+    loginId: string;
+    password: string;
+    deviceLabel?: string;
+  }): Observable<any> {
+    const body = {
+      identifier: req.loginId,
+      password: req.password,
+      deviceLabel: req.deviceLabel || 'web',
+    };
 
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(mapped));
+    return this.http
+      .post<any>(`${this.base}/platform/auth/login`, body)
+      .pipe(
+        tap((res) => this.handleLoginResponse(res)),
+        catchError((err) => {
+          console.error('PLATFORM LOGIN ERROR:', err);
+          return throwError(() => err);
+        })
+      );
+  }
 
-  this.tokenSignal.set(token);
-  this.currentUserSignal.set(mapped);
+  // ─── Login response helpers ─────────────────────────────
 
-  console.log('Saved login roles:', mapped.roles);
-}
+  /** রেসপন্স থেকে permission code-এর তালিকা বের করে */
+  private extractPermissions(data: any): string[] {
+    const raw =
+      data?.permissions ?? data?.permissionCodes ?? data?.authorities ?? [];
+
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+      .map((p: any) =>
+        typeof p === 'string' ? p : p?.code ?? p?.permissionCode ?? ''
+      )
+      .filter((c: string) => !!c && !c.startsWith('ROLE_'));
+  }
+
+  private handleLoginResponse(res: any): void {
+    const data = res?.data ?? res;
+
+    const token =
+      data?.accessToken ??
+      data?.access_token ??
+      data?.token ??
+      res?.accessToken ??
+      res?.access_token ??
+      res?.token;
+
+    const id = data?.userId ?? data?.user_id ?? data?.id;
+
+    const rolesRaw = data?.roles ?? data?.roleNames ?? [];
+
+    const roles: string[] = Array.isArray(rolesRaw)
+      ? rolesRaw.map((role: any) =>
+          typeof role === 'string'
+            ? role
+            : role?.code ?? role?.name ?? String(role)
+        )
+      : typeof rolesRaw === 'string'
+        ? [rolesRaw]
+        : [];
+
+    const permissions = this.extractPermissions(data);
+
+    if (!token || !id) {
+      console.error('Login response missing token or user ID:', {
+        hasToken: !!token,
+        hasUserId: !!id,
+        roles,
+      });
+      return;
+    }
+
+    const mapped: AppUser = {
+      id: String(id),
+      municipalityId: data?.municipalityId ?? null,
+      mobileNormalized: data?.mobile ?? '',
+      emailNormalized: data?.email ?? '',
+      nameBn: data?.nameBn ?? 'Admin',
+      nameEn: data?.nameEn ?? 'Admin',
+      status: data?.status ?? 'ACTIVE',
+      roles,
+      permissions,
+      formLanguage: 'BN',
+    };
+
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(USER_KEY, JSON.stringify(mapped));
+
+    this.tokenSignal.set(token);
+    this.currentUserSignal.set(mapped);
+
+    // ডিবাগ: লগইনের পর কয়টা role ও permission এলো
+    console.log('LOGIN OK → roles:', roles, '| permissions count:', permissions.length);
+  }
+
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -275,25 +232,16 @@ console.log('RES KEYS:', Object.keys(res ?? {}));
 
   /** POST /register/check-mobile */
   checkMobileDuplicate(mobile: string): Observable<any> {
-    return this.http.post<any>(
-      `${this.base}/register/check-mobile`,
-      { mobile }
-    );
+    return this.http.post<any>(`${this.base}/register/check-mobile`, { mobile });
   }
 
   /** POST /register/send-otp */
-  requestOtp(
-    mobile: string,
-    purpose = 'REGISTRATION'
-  ): Observable<any> {
-    return this.http.post<any>(
-      `${this.base}/register/send-otp`,
-      {
-        mobile,
-        purpose,
-        language: 'BN',
-      }
-    );
+  requestOtp(mobile: string, purpose = 'REGISTRATION'): Observable<any> {
+    return this.http.post<any>(`${this.base}/register/send-otp`, {
+      mobile,
+      purpose,
+      language: 'BN',
+    });
   }
 
   /** POST /register/verify-otp */
@@ -302,14 +250,11 @@ console.log('RES KEYS:', Object.keys(res ?? {}));
     otp: string,
     purpose = 'REGISTRATION'
   ): Observable<any> {
-    return this.http.post<any>(
-      `${this.base}/register/verify-otp`,
-      {
-        mobile,
-        otp,
-        purpose,
-      }
-    );
+    return this.http.post<any>(`${this.base}/register/verify-otp`, {
+      mobile,
+      otp,
+      purpose,
+    });
   }
 
   /** POST /register/complete */
@@ -325,29 +270,20 @@ console.log('RES KEYS:', Object.keys(res ?? {}));
     [key: string]: any;
   }): Observable<any> {
     // Citizen registration intentionally does not send municipalityId.
-    return this.http.post<any>(
-      `${this.base}/register/complete`,
-      payload
-    );
+    return this.http.post<any>(`${this.base}/register/complete`, payload);
   }
 
   // ─── Forgot Password ────────────────────────────────────
 
   /** POST /auth/forgot/send-otp */
-  forgotSendOtp(
-    mobile: string,
-    municipalityId?: string
-  ): Observable<any> {
+  forgotSendOtp(mobile: string, municipalityId?: string): Observable<any> {
     const payload: any = { mobile };
 
     if (municipalityId) {
       payload.municipalityId = Number(municipalityId);
     }
 
-    return this.http.post<any>(
-      `${this.base}/auth/forgot/send-otp`,
-      payload
-    );
+    return this.http.post<any>(`${this.base}/auth/forgot/send-otp`, payload);
   }
 
   /** POST /auth/forgot/reset */
@@ -358,101 +294,75 @@ console.log('RES KEYS:', Object.keys(res ?? {}));
     newPassword: string;
     confirmPassword: string;
   }): Observable<any> {
-    return this.http.post<any>(
-      `${this.base}/auth/forgot/reset`,
-      payload
-    );
+    return this.http.post<any>(`${this.base}/auth/forgot/reset`, payload);
   }
 
   // ─── Lookups ────────────────────────────────────────────
 
   /** GET /lookups/{category} */
   getLookup(category: string): Observable<any> {
-    return this.http.get<any>(
-      `${this.base}/lookups/${category}`
-    );
+    return this.http.get<any>(`${this.base}/lookups/${category}`);
   }
 
   /** GET /lookups/{category}/children?parentId= */
-  getLookupChildren(
-    category: string,
-    parentId: string
-  ): Observable<any> {
+  getLookupChildren(category: string, parentId: string): Observable<any> {
     const params = new HttpParams().set('parentId', parentId);
-
-    return this.http.get<any>(
-      `${this.base}/lookups/${category}/children`,
-      { params }
-    );
+    return this.http.get<any>(`${this.base}/lookups/${category}/children`, {
+      params,
+    });
   }
 
   /** GET /lookups/designations */
   getDesignations(): Observable<any> {
-    return this.http.get<any>(
-      `${this.base}/lookups/designations`
-    );
-  }
-
+  return this.http.get<any>(`${this.base}/lookups/DESIGNATION`);
+}
   // ─── Users ──────────────────────────────────────────────
 
   /** GET /users/{id}/profile */
   getUserProfile(id: string): Observable<any> {
-    return this.http.get<any>(
-      `${this.base}/users/${id}/profile`
-    );
+    return this.http.get<any>(`${this.base}/users/${id}/profile`);
   }
 
   /** GET /users/search?q= */
   searchUsers(q: string): Observable<any> {
     const params = new HttpParams().set('q', q);
-
-    return this.http.get<any>(
-      `${this.base}/users/search`,
-      { params }
-    );
+    return this.http.get<any>(`${this.base}/users/search`, { params });
   }
 
   // ─── Roles / Admin ─────────────────────────────────────
 
   /** GET /admin/roles */
   getRoles(): Observable<any> {
-    return this.http.get<any>(
-      `${this.base}/admin/roles`
-    );
+    return this.http.get<any>(`${this.base}/admin/roles`);
   }
+
   getMunicipalitiesForRegistration(): Observable<any> {
-  return this.http.get<any>(
-    `${this.base}/public/municipalities`
-  );
-}
+    return this.http.get<any>(`${this.base}/public/municipalities`);
+  }
+
+  createCitizen(payload: any): Observable<any> {
+    return this.http.post(`${this.base}/users/citizens`, payload);
+  }
+
+  // ─── Role & Permission checks ──────────────────────────
 
   hasRole(role: string): boolean {
-  const roles = this.currentUserSignal()?.roles ?? [];
-
-  return roles.some(
-    (item) => item?.trim().toUpperCase() === role.trim().toUpperCase()
-  );
-}
+    const roles = this.currentUserSignal()?.roles ?? [];
+    return roles.some(
+      (item) => item?.trim().toUpperCase() === role.trim().toUpperCase()
+    );
+  }
 
   hasAnyRole(...roles: string[]): boolean {
-    const userRoles = this.currentUserSignal()?.roles || [];
-    return roles.some((role) => userRoles.includes(role));
+    return roles.some((role) => this.hasRole(role));
   }
 
   hasPermission(permission: string): boolean {
-    const user = this.currentUserSignal();
-    const permissions = (user as any)?.permissions || [];
-
+    const permissions = this.currentUserSignal()?.permissions ?? [];
     return permissions.includes(permission);
   }
 
   hasAnyPermission(...permissions: string[]): boolean {
-    return permissions.some((permission) =>
-      this.hasPermission(permission)
-    );
+    return permissions.some((permission) => this.hasPermission(permission));
   }
-  createCitizen(payload: any): Observable<any> {
-  return this.http.post(`${this.base}/users/citizens`, payload);
-}
-
 }

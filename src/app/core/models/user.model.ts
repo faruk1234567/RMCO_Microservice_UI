@@ -3,6 +3,7 @@ export interface AppUser {
   municipalityId: string | null;
   mobileNormalized: string;
   emailNormalized?: string;
+  permissions?: string[];
   nameBn: string;
   nameEn?: string;
   status: 'ACTIVE' | 'INACTIVE' | 'PENDING';

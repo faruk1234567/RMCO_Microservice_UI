@@ -77,6 +77,13 @@ export const routes: Routes = [
           import('./features/admin/users/user-admin.component')
             .then(m => m.UserAdminComponent),
       },
+      // পৌরসভা অ্যাডমিনের জন্য রোল ব্যবস্থাপনা (platformAdminGuard ছাড়া)
+      {
+        path: 'role-management',
+        loadComponent: () =>
+          import('./features/admin/roles/role-list.component')
+            .then(m => m.RoleListComponent),
+      },
       {
         path: 'wards',
         loadComponent: () =>
@@ -86,6 +93,7 @@ export const routes: Routes = [
       { path: 'dashboard', loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'committee', loadComponent: () => import('./features/committee/committee-list.component').then(m => m.CommitteeListComponent) },
       { path: 'committee/create', loadComponent: () => import('./features/committee/committee-form.component').then(m => m.CommitteeFormComponent) },
+      { path: 'committee/hierarchy', loadComponent: () => import('./features/committee/committee-hierarchy.component').then(m => m.CommitteeHierarchyComponent) },
       { path: 'committee/:id', loadComponent: () => import('./features/committee/committee-detail.component').then(m => m.CommitteeDetailComponent) },
       { path: 'workflow', loadComponent: () => import('./features/workflow/workflow-list.component').then(m => m.WorkflowListComponent) },
       { path: 'workflow/:id', loadComponent: () => import('./features/workflow/workflow-decision.component').then(m => m.WorkflowDecisionComponent) },
@@ -102,6 +110,19 @@ export const routes: Routes = [
       { path: 'config/labels', loadComponent: () => import('./features/config/label-template.component').then(m => m.LabelTemplateComponent) },
       { path: 'config/upload-policy', loadComponent: () => import('./features/config/upload-policy.component').then(m => m.UploadPolicyComponent) },
       { path: 'config/change-log', loadComponent: () => import('./features/config/change-log.component').then(m => m.ChangeLogComponent) },
+
+      // ---------- কর প্রস্তাব, আপত্তি, নোটিশ ----------
+      { path: 'tax-proposals', loadComponent: () => import('./features/municipal/tax-proposal-list.component').then(m => m.TaxProposalListComponent) },
+      { path: 'tax-proposals/new', loadComponent: () => import('./features/municipal/tax-proposal-form.component').then(m => m.TaxProposalFormComponent) },
+      { path: 'tax-proposals/:id', loadComponent: () => import('./features/municipal/tax-proposal-detail.component').then(m => m.TaxProposalDetailComponent) },
+      { path: 'objections', loadComponent: () => import('./features/municipal/objection-list.component').then(m => m.ObjectionListComponent) },
+      { path: 'objections/new', loadComponent: () => import('./features/municipal/objection-form.component').then(m => m.ObjectionFormComponent) },
+      { path: 'objections/:id', loadComponent: () => import('./features/municipal/objection-detail.component').then(m => m.ObjectionDetailComponent) },
+      { path: 'notices', loadComponent: () => import('./features/municipal/notice-home.component').then(m => m.NoticeHomeComponent) },
+      { path: 'notices/messages/new', loadComponent: () => import('./features/municipal/notice-message-form.component').then(m => m.NoticeMessageFormComponent) },
+      { path: 'notices/campaigns/new', loadComponent: () => import('./features/municipal/notice-campaign-form.component').then(m => m.NoticeCampaignFormComponent) },
+      { path: 'notices/campaigns/:id', loadComponent: () => import('./features/municipal/notice-campaign-detail.component').then(m => m.NoticeCampaignDetailComponent) },
+      { path: 'notices/print-jobs/new', loadComponent: () => import('./features/municipal/notice-print-job.component').then(m => m.NoticePrintJobComponent) },
 
       { path: 'audit', loadComponent: () => import('./features/audit/audit-list.component').then(m => m.AuditListComponent) },
     ],

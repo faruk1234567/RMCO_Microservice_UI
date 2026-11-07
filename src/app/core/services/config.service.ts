@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, catchError } from 'rxjs';
+import { Observable, of, catchError, map } from 'rxjs';
+
 import { environment } from '../../../environments/environment';
 import {
   Designation,
@@ -33,24 +34,48 @@ export class ConfigService {
 
   // ---- Designations ----
   listDesignations(): Observable<Designation[]> {
-    return this.http.get<Designation[]>(`${this.base}/config/designations`).pipe(
-      catchError(() =>
-        of([
-          { id: 'd-1', municipalityId: 'm-001', code: 'CHAIR', nameBn: 'সভাপতি', nameEn: 'Chairperson', isActive: true },
-          { id: 'd-2', municipalityId: 'm-001', code: 'SEC', nameBn: 'সদস্য সচিব', nameEn: 'Member Secretary', isActive: true },
-          { id: 'd-3', municipalityId: 'm-001', code: 'MEM', nameBn: 'সদস্য', nameEn: 'Member', isActive: true },
-          { id: 'd-4', municipalityId: 'm-001', code: 'VC', nameBn: 'সহ-সভাপতি', nameEn: 'Vice Chair', isActive: true },
-        ])
-      )
-    );
-  }
+  return this.http.get<any>(
+    `${environment.identityUrl}/lookups/DESIGNATION`
+  ).pipe(
+    map(response => {
+      const data = response?.data ?? response;
 
+      return (Array.isArray(data) ? data : []).map((d: any) => ({
+        id: String(d.id),
+       municipalityId: String(d.municipalityId ?? ''),
+        code: d.code,
+        nameBn: d.nameBn,
+        nameEn: d.nameEn,
+        isActive: d.isActive
+      }));
+    })
+  );
+}
   createDesignation(dto: Partial<Designation>): Observable<Designation> {
-    return this.http.post<Designation>(`${this.base}/config/designations`, dto).pipe(
-      catchError(() => of({ id: 'd-new', municipalityId: 'm-001', code: dto.code || '', nameBn: dto.nameBn || '', isActive: true }))
-    );
-  }
+  return this.http.post<any>(
+    `${environment.identityUrl}/lookups`,
+    {
+      category: 'DESIGNATION',
+      code: dto.code,
+      nameBn: dto.nameBn,
+      nameEn: dto.nameEn,
+      isActive: true
+    }
+  ).pipe(
+    map(response => {
+      const d = response?.data ?? response;
 
+      return {
+        id: String(d.id),
+       municipalityId: String(d.municipalityId ?? ''),
+        code: d.code,
+        nameBn: d.nameBn,
+        nameEn: d.nameEn,
+        isActive: d.isActive
+      };
+    })
+  );
+}
   // ---- Approval Routes ----
   listRoutes(): Observable<ApprovalRoute[]> {
     return this.http.get<ApprovalRoute[]>(`${this.base}/config/approval-routes`).pipe(

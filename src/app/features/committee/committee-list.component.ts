@@ -76,7 +76,7 @@ import { ENGINE_STYLES, Row, STATUS_BN, committeeName, errMsg, fmtDate, idOf, pi
 export class CommitteeListComponent implements OnInit {
   private api = inject(EngineApiService);
   tabs = [
-    { v: '', l: 'সব' }, { v: 'DRAFT', l: 'খসড়া' }, { v: 'PENDING_APPROVAL', l: 'অনুমোদনাধীন' },
+    { v: '', l: 'সব' }, { v: 'DRAFT', l: 'খসড়া' }, { v: 'IN_APPROVAL', l: 'অনুমোদনাধীন' },
     { v: 'ACTIVE', l: 'সক্রিয়' }, { v: 'REJECTED', l: 'প্রত্যাখ্যাত' },
   ];
   all = signal<Row[]>([]);
@@ -92,11 +92,13 @@ export class CommitteeListComponent implements OnInit {
 
   filtered = computed(() => {
     const t = this.tab(), s = this.q().trim().toLowerCase();
-    return this.all().filter(r => (!t || r['status'] === t) && (!s || committeeName(r).toLowerCase().includes(s)));
+    return this.all().filter(r => this.matches(r, t) && (!s || committeeName(r).toLowerCase().includes(s)));
   });
   pages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.size)));
   pageRows = computed(() => this.filtered().slice(this.page() * this.size, (this.page() + 1) * this.size));
-  count = (v: string) => this.all().filter(r => !v || r['status'] === v).length;
+  matches = (r: Row, v: string): boolean =>
+    !v || (v === 'IN_APPROVAL' ? ['SUBMITTED', 'UNDER_APPROVAL'].includes(r['status']) : r['status'] === v);
+  count = (v: string) => this.all().filter(r => this.matches(r, v)).length;
 
   ngOnInit() {
     this.api.listCommittees().subscribe({

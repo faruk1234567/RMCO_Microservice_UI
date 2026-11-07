@@ -361,25 +361,70 @@ export class CommitteeFormComponent implements OnInit {
   };
 
   // ---------------- সংরক্ষণ / জমা ----------------
-  private payload(): Row {
-    return {
-      nameBn: this.form.nameBn.trim(), nameEn: this.form.nameEn.trim(), scopeNodeId: this.form.scopeNodeId,
-      members: this.form.members, fields: this.form.fields, resolution: this.form.resolution,
-    };
-  }
+ private payload(): {
+  code: string;
+  nameBn: string;
+  nameEn?: string;
+  scopeNodeId: string | null;
+  termStart: string;
+  termEnd: string;
+  dynamicValues: Record<string, any>;
+  members: any[];
+  documents: any[];
+} {
+  return {
+    code: `COM-${Date.now()}`,
+    nameBn: this.form.nameBn.trim(),
+    nameEn: this.form.nameEn.trim(),
+    scopeNodeId: this.form.scopeNodeId,
+    termStart: new Date().toISOString(),
+    termEnd: new Date(
+      Date.now() + 365 * 24 * 60 * 60 * 1000
+    ).toISOString(),
+    dynamicValues: this.form.fields,
+    members: this.form.members.map(m => ({
+      designationId: m.designationId,
+      name: m.name,
+      mobile: m.mobile,
+      dynamicValues: m.fields
+    })),
+    documents: this.form.resolution.documentId
+      ? [{
+          documentId: this.form.resolution.documentId,
+          role: 'PROPOSAL'
+        }]
+      : []
+  };
+}
   private save$(): Observable<Row> {
-    const id = this.draftId();
-    if (id) return this.api.updateDraft(id, this.payload());
-    return new Observable<Row>(sub => {
-      this.api.createDraft({
-        committeeTypeId: this.typeId, typeVersionId: this.versionId, scopeNodeId: this.form.scopeNodeId!,
-        nameBn: this.form.nameBn.trim(), nameEn: this.form.nameEn.trim(),
-      }).subscribe({
-        next: (r) => { this.draftId.set(String(r['id'] ?? r['draftId'] ?? r['committeeId'])); sub.next(r); sub.complete(); },
-        error: (e) => sub.error(e),
-      });
-    });
+  const id = this.draftId();
+  const payload = this.payload();
+
+  if (id) {
+    return this.api.updateDraft(id, payload);
   }
+
+  return new Observable<Row>(sub => {
+    this.api.createDraft({
+      typeVersionId: this.versionId,
+      payload: payload
+    }).subscribe({
+      next: (r) => {
+        const draftId = r['draftId'];
+
+        if (!draftId) {
+          sub.error(new Error('Backend response-এ draftId পাওয়া যায়নি।'));
+          return;
+        }
+
+        this.draftId.set(String(draftId));
+        sub.next(r);
+        sub.complete();
+      },
+      error: (e) => sub.error(e)
+    });
+  });
+}
   private stamp() { this.savedAt.set(new Date().toLocaleTimeString('bn-BD')); }
 
   next() {

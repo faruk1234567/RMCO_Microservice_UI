@@ -192,16 +192,36 @@ onDocClick(e: MouseEvent) {
   logout(): void {
     this.auth.logout();
   }
- getMenuRoute(item: MenuItem): string | null {
+getMenuRoute(item: MenuItem): string | null {
+  const isPlatformAdmin = this.auth.hasRole('PLATFORM_ADMIN');
+
   if (item.code === 'ADMIN_USERS') {
-    return this.auth.hasRole('PLATFORM_ADMIN')
-      ? '/admin/users'
-      : '/user-management';
+    return isPlatformAdmin ? '/admin/users' : '/user-management';
   }
 
-  return item.routePath;
-}
+  if (!item.routePath) {
+    return item.routePath;
+  }
 
+  // পাথ স্বাভাবিক করা: শুরুতে একটাই "/", শেষে "/" নেই, query নেই
+  const path =
+    '/' +
+    item.routePath
+      .split('?')[0]
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '');
+
+  if (!isPlatformAdmin) {
+    const map: Record<string, string> = {
+      '/admin/roles': '/role-management',
+      '/admin/users': '/user-management',
+      '/admin/wards': '/wards',
+    };
+    return map[path] ?? path;
+  }
+
+  return path;
+}
 
 
 }
