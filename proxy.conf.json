@@ -17,5 +17,17 @@
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"
+  },
+   "/committee-service": {
+    "target": "http://localhost:8080",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
   }
+  ,"/document-service": {
+  "target": "http://localhost:8080",
+  "secure": false,
+  "changeOrigin": true,
+  "logLevel": "debug"
+}
 }

@@ -29,22 +29,26 @@ export interface ApprovalRouteStep {
 
 export interface ScopeLevel {
   id: string;
-  municipalityId: string;
-  code: string;
+  municipalityId?: string;
+  code?: string;
+  levelNo?: number;
   nameBn: string;
   nameEn?: string;
-  sortOrder: number;
+  sortOrder?: number;
 }
+
 
 export interface ScopeNode {
   id: string;
+  code?: string;
   levelId: string;
-  parentId?: string;
-  code: string;
   nameBn: string;
   nameEn?: string;
-  isActive: boolean;
+  levelNo?: number;
+  levelNameBn?: string;
+  parentId?: string | null;
   children?: ScopeNode[];
+  isActive?: boolean;
 }
 
 export interface DynamicField {

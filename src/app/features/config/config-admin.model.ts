@@ -12,6 +12,12 @@ export interface Designation {
   nameEn?: string;
   isActive: boolean;
 }
+export interface ScopeLevel {
+  id: string;
+  levelNo: number;
+  nameBn: string;
+  nameEn?: string;
+}
 
 export type VersionStatus = 'DRAFT' | 'PUBLISHED' | 'RETIRED';
 
@@ -79,6 +85,7 @@ export interface TypeVersion {
   nameBn: string;
   nameEn: string;
   maxMembers: number | null;
+  minMembers?: number;
   termMonths: number | null;
   scopeLevelNos: number[];
   designations: VersionDesignation[];

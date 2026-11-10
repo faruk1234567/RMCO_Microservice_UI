@@ -6,9 +6,9 @@ export const environment = {
   identityUrl: '/identity-service/api/v1',
   configUrl: '/config-service/api/v1',
 
-  committeeUrl: '/api/v1',
+  committeeUrl: '/committee-service',
   workflowUrl: '/api/v1',
-  documentUrl: '/api/v1',
+  documentUrl: '/document-service',
   auditUrl: '/api/v1',
 
   // ---- নতুন ----

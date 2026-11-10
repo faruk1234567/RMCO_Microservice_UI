@@ -1,0 +1,91 @@
+:host { display: block; }
+
+.nav {
+  background: var(--nav-bg, #78898b);
+  color: #fff;
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { position: relative; }
+}
+
+/* top bar */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0 16px;
+
+  > li > .item {
+    padding: 15px 16px;
+    &:hover, .open > & { background: rgba(255, 255, 255, 0.14); }
+    &.active { box-shadow: inset 0 -3px 0 #fff; }
+  }
+  > li.open > .item { background: rgba(255, 255, 255, 0.18); }
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.95rem;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  &:focus-visible { outline: 3px solid #fff; outline-offset: -3px; }
+}
+
+.caret {
+  width: 7px; height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.15s;
+}
+li.open > .item > .caret { transform: rotate(-135deg) translate(-2px, -1px); }
+
+/* dropdown panels */
+.panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  min-width: 230px;
+  padding: 8px;
+  background: #fff;
+  color: var(--text-primary, #1b2a23);
+  border: 1px solid var(--border-light, #e2e9e4);
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(20, 40, 30, 0.18);
+
+  .item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    justify-content: space-between;
+    &:hover { background: #eef6f1; }
+    &.active { background: #e3f1ea; color: var(--primary, #0f6b45); font-weight: 600; }
+  }
+  li.open > .item { background: #eef6f1; }
+
+  /* 3rd level and deeper open to the right */
+  .panel { top: -8px; left: calc(100% + 6px); }
+  .caret { transform: rotate(-45deg); }
+  li.open > .item > .caret { transform: rotate(-45deg); }
+}
+
+/* mobile: sob kichu upor theke niche stack hobe */
+@media (max-width: 800px) {
+  .bar { flex-direction: column; padding: 0; }
+  .panel {
+    position: static;
+    min-width: 0;
+    margin: 0 0 6px 14px;
+    box-shadow: none;
+    .panel { margin-left: 14px; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) { .caret { transition: none; } }

@@ -4,9 +4,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ConfigService } from '../../core/services/config.service';
-import { ConfigAdminService } from '../../core/services/config-admin.service';
+//import { ConfigAdminService } from '../../core/services/config-admin.service';
 import { ApprovalRoute, ApprovalStep, ApproverType, Designation } from '../../core/models/config-admin.model';
 import { CONFIG_STYLES, errMsg } from './config-shared';
+import { ConfigAdminService } from './config-admin.service';
 
 @Component({
   selector: 'app-route-editor',
@@ -18,7 +19,7 @@ import { CONFIG_STYLES, errMsg } from './config-shared';
       <div class="page-header">
         <div>
           <a routerLink="/config/routes" class="muted">← রুটের তালিকা</a>
-          <h1>{{ isNew() ? 'নতুন অনুমোদন রুট' : (route().nameBn || 'অনুমোদন রুট') }}</h1>
+         <h1>{{ isNew() ? 'নতুন অনুমোদন রুট' : (route().nameBn || 'অনুমোদন রুট') }}</h1>P
         </div>
       </div>
 
@@ -126,9 +127,31 @@ export class RouteEditorComponent implements OnInit {
     if (!id || id === 'new') { this.loading.set(false); return; }
     this.isNew.set(false);
     this.svc.getRoute(id).subscribe({
-      next: (r) => { this.route.set({ ...r, steps: [...(r.steps ?? [])].sort((a, b) => a.levelNo - b.levelNo) }); this.loading.set(false); },
-      error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
+  next: (r: any) => {
+    this.route.set({
+      code: '',
+      nameBn: r.name || '',
+      nameEn: '',
+      ...r,
+      steps: (r.steps ?? [])
+        .sort((a: any, b: any) => a.stepNo - b.stepNo)
+        .map((s: any) => ({
+          levelNo: s.stepNo,
+          approverType: s.approverKind,
+          approverRef: s.approverRefId,
+          slaHours: s.slaHours,
+          escalateToRef: s.escalateToRefId,
+          fallbackRef: s.fallbacks?.[0]?.fallbackRefId ?? null
+        }))
     });
+
+    this.loading.set(false);
+  },
+  error: (e) => {
+    this.err.set(errMsg(e));
+    this.loading.set(false);
+  }
+});
   }
 
   addStep() { const r = this.route(); this.route.set({ ...r, steps: [...r.steps, this.blank(r.steps.length + 1)] }); }
@@ -137,11 +160,39 @@ export class RouteEditorComponent implements OnInit {
     this.route.set({ ...r, steps: r.steps.filter((_, idx) => idx !== i).map((s, idx) => ({ ...s, levelNo: idx + 1 })) });
   }
 
-  create() {
-    this.saving.set(true); this.err.set('');
-    this.svc.createRoute(this.route()).subscribe({
-      next: () => { this.saving.set(false); this.router.navigate(['/config/routes']); },
-      error: (e) => { this.saving.set(false); this.err.set(errMsg(e)); },
-    });
-  }
+create() {
+  this.saving.set(true);
+  this.err.set('');
+
+  const r = this.route();
+
+  const payload = {
+  code: r.code,
+  name: r.nameBn,
+  steps: r.steps.map(s => ({
+    stepNo: Number(s.levelNo),
+    approverKind: s.approverType,
+    approverRefId: s.approverRef
+      ? String(s.approverRef)
+      : null,
+    slaHours: Number(s.slaHours),
+    escalateToRefId: s.escalateToRef || null,
+    fallbacks: []
+  }))
+};
+
+  console.log('CREATE ROUTE PAYLOAD:', JSON.stringify(payload, null, 2));
+
+  this.svc.createRoute(payload).subscribe({
+    next: () => {
+      this.saving.set(false);
+      this.router.navigate(['/config/routes']);
+    },
+    error: (e) => {
+      this.saving.set(false);
+      this.err.set(errMsg(e));
+      console.error('CREATE ROUTE ERROR:', e);
+    }
+  });
+}
 }

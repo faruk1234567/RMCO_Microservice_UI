@@ -44,7 +44,7 @@ import { CONFIG_STYLES, errMsg } from './config-shared';
             <div class="form-group"><label>Name (English)</label>
               <input class="form-control" [(ngModel)]="nameEn" /></div>
           </div>
-          <button class="btn btn-primary" [disabled]="saving() || !code.trim() || !nameBn.trim() || !activeGroup()" (click)="create()">সংরক্ষণ</button>
+          <button class="btn btn-primary" [disabled]="saving() || !code.trim() || !nameBn.trim() || !activeGroup()" (click)="create()">নিয়মমালা</button>
         </div></div>
       }
 

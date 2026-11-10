@@ -1,0 +1,257 @@
+<div class="page-container mm">
+
+  <header class="mm-head">
+    <div>
+      <h1>মেনু ব্যবস্থাপনা</h1>
+      <p>হেডারের মেনু কাঠামো এখান থেকে সাজান। মোট {{ totalCount() }}টি মেনু।</p>
+    </div>
+    <button type="button" class="btn btn-primary" (click)="addRoot()">নতুন মেনু</button>
+  </header>
+
+  @if (message(); as msg) {
+    <div class="alert" [class.err]="msg.type === 'err'" role="status">{{ msg.text }}</div>
+  }
+
+  <div class="mm-grid">
+
+    <!-- ============ Structure ============ -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>মেনু কাঠামো</h2>
+        <div class="tools">
+          <input type="search" class="search" placeholder="মেনু খুঁজুন"
+                 [ngModel]="search()" (ngModelChange)="search.set($event)" aria-label="মেনু খুঁজুন">
+          <button type="button" class="txt-btn" (click)="expandAll()">সব খুলুন</button>
+          <button type="button" class="txt-btn" (click)="collapseAll()">সব গুটান</button>
+        </div>
+      </div>
+
+      @if (selectedCount() > 0) {
+        <div class="bulk" role="region" aria-label="নির্বাচিত মেনু">
+          <strong>{{ selectedCount() }}টি মেনু নির্বাচিত</strong>
+          <span class="bulk-lbl">সরান:</span>
+          <select [(ngModel)]="bulkTarget" aria-label="কোথায় সরাবেন">
+            <option value="" disabled>গন্তব্য বেছে নিন</option>
+            <option value="root">হেডারের মূল স্তরে (কোনো গ্রুপের ভেতরে নয়)</option>
+            @for (o of bulkOptions(); track o.id) {
+              <option [value]="o.id">{{ o.label }} এর ভেতরে</option>
+            }
+          </select>
+          <button type="button" class="btn btn-primary sm" (click)="moveSelected()">স্থানান্তর করুন</button>
+          <button type="button" class="txt-btn" (click)="clearSelection()">বাতিল</button>
+        </div>
+      } @else if (rows().length) {
+        <p class="hint">মেনু ধরে টেনে অন্য মেনুর ওপর ছাড়লে সেটি ভেতরে যাবে, দুই মেনুর মাঝখানে ছাড়লে ক্রম বদলাবে। একসাথে অনেকগুলো সরাতে বাঁ পাশের বাক্সে টিক দিন।</p>
+      }
+
+      <div class="table" role="tree" aria-label="মেনু কাঠামো">
+        <div class="thead">
+          <div class="c-check">
+            <input type="checkbox" [checked]="allChecked()" (change)="toggleAll()" aria-label="সব নির্বাচন করুন">
+          </div>
+          <div class="c-name">মেনুর নাম</div>
+          <div class="c-path">পেজের পথ</div>
+          <div class="c-status">অবস্থা</div>
+        </div>
+
+        @for (r of rows(); track r.m.id) {
+          <div class="row" role="treeitem"
+               [class.is-edit]="editingId() === r.m.id"
+               [class.is-checked]="selected().has(r.m.id)"
+               [class.is-off]="!r.m.isActive"
+               [class.is-dragging]="dragIds().includes(r.m.id)"
+               [class.drop-before]="dropAt()?.id === r.m.id && dropAt()?.pos === 'before'"
+               [class.drop-after]="dropAt()?.id === r.m.id && dropAt()?.pos === 'after'"
+               [class.drop-inside]="dropAt()?.id === r.m.id && dropAt()?.pos === 'inside'"
+               [attr.draggable]="search().trim() ? null : 'true'"
+               (dragstart)="dragStart($event, r.m)"
+               (dragover)="dragOver($event, r.m)"
+               (drop)="drop($event, r.m)"
+               (dragend)="dragEnd()">
+
+            <div class="c-check">
+              <input type="checkbox" [checked]="selected().has(r.m.id)" (change)="toggleSelect(r.m.id)"
+                     [attr.aria-label]="r.m.labelBn + ' নির্বাচন করুন'">
+            </div>
+
+            <div class="c-name" [style.padding-left.px]="r.depth * 26">
+              <button type="button" class="chev"
+                      [class.invisible]="!r.m.children?.length"
+                      [class.open]="isExpanded(r.m.id)"
+                      [attr.aria-label]="isExpanded(r.m.id) ? 'গুটিয়ে নিন' : 'খুলুন'"
+                      (click)="toggle(r.m.id)"></button>
+              <div class="txt">
+                <div class="bn">{{ r.m.labelBn }}</div>
+                <div class="sub">
+                  {{ r.m.labelEn }}
+                  <span class="dot">·</span>
+                  @if (r.m.children?.length) { গ্রুপ, {{ r.m.children!.length }}টি উপ-মেনু }
+                  @else if (r.m.routePath) { পেজ }
+                  @else { খালি গ্রুপ }
+                </div>
+              </div>
+            </div>
+
+            <div class="c-path">{{ r.m.routePath || '—' }}</div>
+            <div class="c-status">
+              <span class="pill" [class.on]="r.m.isActive">{{ r.m.isActive ? 'সক্রিয়' : 'বন্ধ' }}</span>
+            </div>
+
+            <div class="c-actions">
+              <button type="button" class="act" (click)="addChild(r.m)">উপ-মেনু যোগ</button>
+              <button type="button" class="act" (click)="edit(r.m)">সম্পাদনা</button>
+              <button type="button" class="act" (click)="toggleActive(r.m)">{{ r.m.isActive ? 'বন্ধ করুন' : 'চালু করুন' }}</button>
+              <button type="button" class="act danger" (click)="remove(r.m)">মুছুন</button>
+            </div>
+          </div>
+        } @empty {
+          <p class="empty">
+            @if (search().trim()) { "{{ search() }}" নামে কোনো মেনু পাওয়া যায়নি। }
+            @else { এখনো কোনো মেনু নেই। ডান পাশ থেকে প্রথম মেনুটি যোগ করুন। }
+          </p>
+        }
+      </div>
+
+      @if (dragIds().length) {
+        <div class="rootzone" [class.over]="rootOver()"
+             (dragover)="$event.preventDefault(); rootOver.set(true)"
+             (dragleave)="rootOver.set(false)"
+             (drop)="dropOnRoot($event)">
+          এখানে ছাড়লে মেনুটি হেডারের মূল স্তরে চলে যাবে
+        </div>
+      }
+    </section>
+
+    <!-- ============ Details ============ -->
+    <section class="panel form-panel">
+      <div class="panel-head"><h2>{{ formTitle() }}</h2></div>
+
+      <form class="form" (ngSubmit)="save()">
+
+        <fieldset>
+          <legend>এই মেনু কোথায় দেখাবে?</legend>
+          <div class="choice">
+            <label class="opt" [class.on]="placement === 'root'">
+              <input type="radio" name="placement" value="root" [ngModel]="placement" (ngModelChange)="setPlacement($event)">
+              <span class="t">উপরের মেনু বারে</span>
+              <span class="d">হেডারে সরাসরি দেখাবে</span>
+            </label>
+            <label class="opt" [class.on]="placement === 'child'">
+              <input type="radio" name="placement" value="child" [ngModel]="placement" (ngModelChange)="setPlacement($event)">
+              <span class="t">অন্য মেনুর ভেতরে</span>
+              <span class="d">ড্রপডাউনের ভেতরে দেখাবে</span>
+            </label>
+          </div>
+
+          @if (placement === 'child') {
+            <label class="field">
+              <span class="lbl">কোন মেনুর ভেতরে?</span>
+              <select name="parentId" [(ngModel)]="form.parentId">
+                <option [ngValue]="null" disabled>একটি মেনু বেছে নিন</option>
+                @for (o of parentOptions(); track o.id) {
+                  <option [ngValue]="o.id">{{ o.label }}</option>
+                }
+              </select>
+            </label>
+          }
+        </fieldset>
+
+        <fieldset>
+          <legend>ক্লিক করলে কী হবে?</legend>
+          <div class="choice">
+            <label class="opt" [class.on]="kind === 'page'">
+              <input type="radio" name="kind" value="page" [(ngModel)]="kind">
+              <span class="t">একটি পেজ খুলবে</span>
+              <span class="d">যেমন: কমিটি তালিকা</span>
+            </label>
+            <label class="opt" [class.on]="kind === 'group'">
+              <input type="radio" name="kind" value="group" [(ngModel)]="kind">
+              <span class="t">শুধু গ্রুপ</span>
+              <span class="d">ভেতরে আরও মেনু থাকবে</span>
+            </label>
+          </div>
+
+          @if (kind === 'page') {
+            <label class="field">
+              <span class="lbl">পেজের পথ</span>
+              <input name="routePath" [(ngModel)]="form.routePath" maxlength="255" placeholder="/committee/create">
+            </label>
+            <label class="field">
+              <span class="lbl">কোন পারমিশন থাকলে ব্যবহারকারী এটি দেখবে</span>
+              <input name="perm" [(ngModel)]="form.requiredPermissionCode" maxlength="150" placeholder="committee.view">
+              <span class="help">এটি না দিলে সাধারণ ব্যবহারকারী মেনুটি দেখতে পাবে না, শুধু মেনু-অ্যাডমিন দেখবে।</span>
+            </label>
+          }
+        </fieldset>
+
+        <fieldset>
+          <legend>মেনুর নাম</legend>
+          <label class="field">
+            <span class="lbl">বাংলা নাম</span>
+            <input name="labelBn" [(ngModel)]="form.labelBn" maxlength="150" required>
+          </label>
+          <label class="field">
+            <span class="lbl">ইংরেজি নাম</span>
+            <input name="labelEn" [(ngModel)]="form.labelEn" (ngModelChange)="onEnglishLabel()" maxlength="150" required>
+          </label>
+        </fieldset>
+
+        <div class="preview" aria-live="polite">
+          <span class="pv-label">হেডারে এভাবে দেখাবে</span>
+          <div class="crumbs">
+            @for (c of previewChain(); track $index; let last = $last) {
+              <span class="crumb" [class.cur]="last">{{ c }}</span>
+              @if (!last) { <span class="sep" aria-hidden="true">/</span> }
+            }
+          </div>
+        </div>
+
+        <details class="adv">
+          <summary>উন্নত সেটিংস</summary>
+          <label class="field">
+            <span class="lbl">কোড (অনন্য হতে হবে)</span>
+            <input name="code" [(ngModel)]="form.code" (input)="onCodeInput()" maxlength="100" required>
+            <span class="help">ইংরেজি নাম থেকে নিজে থেকেই তৈরি হয়, সাধারণত বদলানোর দরকার নেই।</span>
+          </label>
+          @if (kind === 'group') {
+            <label class="field">
+              <span class="lbl">প্রয়োজনীয় পারমিশন কোড</span>
+              <input name="permGroup" [(ngModel)]="form.requiredPermissionCode" maxlength="150">
+              <span class="help">গ্রুপের জন্য সাধারণত দরকার নেই। ভেতরের কোনো মেনু দেখার অনুমতি থাকলে গ্রুপ নিজে থেকেই দেখাবে।</span>
+            </label>
+          }
+          <label class="field">
+            <span class="lbl">আইকন</span>
+            <input name="icon" [(ngModel)]="form.icon" maxlength="100">
+          </label>
+          <div class="two">
+            <label class="field">
+              <span class="lbl">ক্রম</span>
+              <input type="number" name="sortOrder" [(ngModel)]="form.sortOrder" min="0">
+            </label>
+            <label class="check">
+              <input type="checkbox" name="isActive" [(ngModel)]="form.isActive">
+              <span>সক্রিয়</span>
+            </label>
+          </div>
+        </details>
+
+        @if (editingId() != null) {
+          <div class="reorder">
+            <span>ক্রম পরিবর্তন</span>
+            <button type="button" class="txt-btn" (click)="moveEditing(-1)">এক ধাপ উপরে</button>
+            <button type="button" class="txt-btn" (click)="moveEditing(1)">এক ধাপ নিচে</button>
+          </div>
+        }
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            {{ saving() ? 'সংরক্ষণ হচ্ছে…' : 'সংরক্ষণ করুন' }}
+          </button>
+          <button type="button" class="btn" (click)="cancel()">বাতিল</button>
+        </div>
+      </form>
+    </section>
+
+  </div>
+</div>

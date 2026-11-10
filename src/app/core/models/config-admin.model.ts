@@ -78,7 +78,10 @@ export interface TypeVersion {
   status: VersionStatus;
   nameBn: string;
   nameEn: string;
+
+  minMembers?: number;
   maxMembers: number | null;
+
   termMonths: number | null;
   scopeLevelNos: number[];
   designations: VersionDesignation[];
@@ -117,6 +120,7 @@ export interface ScopeNode {
 }
 
 export interface ScopeLevel {
+[x: string]: any;
   levelNo: number;
   nameBn: string;
   nameEn?: string;

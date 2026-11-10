@@ -1,6 +1,7 @@
 
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { tap } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
@@ -11,8 +12,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   console.log('[AuthInterceptor] Token available:', !!token);
   console.log('[AuthInterceptor] Token length:', token?.length ?? 0);
 
+  let authReq = req;
+
   if (token) {
-    req = req.clone({
+    authReq = req.clone({
       setHeaders: {
         Authorization: `Bearer ${token}`,
       },
@@ -23,5 +26,16 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     console.warn('[AuthInterceptor] No token available for:', req.url);
   }
 
-  return next(req);
+  console.log('[INTERCEPTOR] Request going to:', authReq.url);
+
+  return next(authReq).pipe(
+    tap({
+      next: (event) => {
+        console.log('[INTERCEPTOR] Response event:', event);
+      },
+      error: (error) => {
+        console.error('[INTERCEPTOR] HTTP ERROR:', error);
+      },
+    })
+  );
 };

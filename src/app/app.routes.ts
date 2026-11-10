@@ -34,9 +34,9 @@ export const routes: Routes = [
       { path: '', redirectTo: 'menus', pathMatch: 'full' },
       {
         path: 'menus',
-        loadComponent: () =>
-          import('./features/config/menu-management.component').then(m => m.MenuManagementComponent),
-      },
+      loadComponent: () =>
+  import('./menu/menu-manager.component')
+    .then(m => m.MenuManagerComponent),},
       {
         path: 'permissions',
         loadComponent: () =>

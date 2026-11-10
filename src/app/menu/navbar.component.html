@@ -1,0 +1,28 @@
+<nav class="nav" aria-label="মূল মেনু">
+
+  <ng-template #level let-items let-depth="depth">
+    <ul [class.bar]="depth === 0" [class.panel]="depth > 0">
+      @for (m of items; track m.id) {
+        <li [class.open]="isOpen(depth, m.id)">
+          @if (m.children?.length) {
+            <button type="button" class="item has-sub"
+                    [attr.aria-expanded]="isOpen(depth, m.id)"
+                    (click)="toggle(depth, m.id)">
+              <span>{{ m.labelBn }}</span>
+              <span class="caret" aria-hidden="true"></span>
+            </button>
+            @if (isOpen(depth, m.id)) {
+              <ng-container *ngTemplateOutlet="level; context: { $implicit: m.children, depth: depth + 1 }" />
+            }
+          } @else {
+            <a class="item" [routerLink]="m.routePath || null" routerLinkActive="active" (click)="close()">
+              {{ m.labelBn }}
+            </a>
+          }
+        </li>
+      }
+    </ul>
+  </ng-template>
+
+  <ng-container *ngTemplateOutlet="level; context: { $implicit: api.navTree(), depth: 0 }" />
+</nav>

@@ -1,6 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, OperatorFunction, map } from 'rxjs';
+
+import { map, Observable, OperatorFunction } from 'rxjs';
+import { ScopeLevel } from '../models/config-admin.model';
 // ⚠ আপনার প্রজেক্টে environment-এর পথ/নাম আলাদা হলে শুধু এই দুই লাইন ঠিক করুন
 import { environment } from '../../../environments/environment';
 import {
@@ -16,6 +18,11 @@ function unwrap<T>(): OperatorFunction<any, T> {
 
 @Injectable({ providedIn: 'root' })
 export class ConfigAdminService {
+  listScopeLevels(): Observable<ScopeLevel[]> {
+  return this.http
+    .get<any>(this.url('/config/scopes/levels'))
+    .pipe(unwrap<ScopeLevel[]>());
+}
   private http = inject(HttpClient);
   private base = environment.configUrl;        // '/config-service/api/v1'
   private url = (p: string) => `${this.base}${p}`;
@@ -33,9 +40,36 @@ export class ConfigAdminService {
   getVersion(versionId: string): Observable<Record<string, any>> {
     return this.http.get(this.url(`/config/type-versions/${versionId}`)).pipe(unwrap());
   }
-  updateVersion(versionId: string, body: Record<string, any>): Observable<Record<string, any>> {
-    return this.http.put(this.url(`/config/type-versions/${versionId}`), body).pipe(unwrap());
-  }
+
+updateVersion(
+  versionId: string,
+  body: Record<string, any>
+): Observable<Record<string, any>> {
+
+  const formationRule = body['actionRules']?.find(
+    (rule: any) => rule.actionCode === 'FORMATION'
+  );
+
+  console.log(
+    '[UPDATE VERSION] FORMATION RULE:',
+    formationRule
+  );
+
+  console.log(
+    '[UPDATE VERSION] FULL REQUEST BODY:',
+    JSON.stringify(body, null, 2)
+  );
+
+  return this.http
+    .put<Record<string, any>>(
+      this.url(`/config/type-versions/${versionId}`),
+      body
+    )
+    .pipe(
+      unwrap<Record<string, any>>()
+    );
+}
+
   validateVersion(versionId: string): Observable<string[]> {
     return this.http.post(this.url(`/config/type-versions/${versionId}/validate`), {}).pipe(unwrap());
   }
@@ -63,9 +97,17 @@ export class ConfigAdminService {
     const params = new HttpParams().set('nameBn', nameBn).set('nameEn', nameEn).set('levelNo', levelNo);
     return this.http.post(this.url('/config/scopes/levels'), null, { params }).pipe(unwrap());
   }
-  createNode(body: { nameBn: string; nameEn?: string; levelNo: number; parentId?: string | null }): Observable<Record<string, any>> {
-    return this.http.post(this.url('/config/scopes/nodes'), body).pipe(unwrap());
-  }
+ createNode(body: {
+  levelId: string;
+  parentId: string | null;
+  code: string;
+  nameBn: string;
+  nameEn?: string;
+}): Observable<Record<string, any>> {
+  return this.http
+    .post<any>(this.url('/config/scopes/nodes'), body)
+    .pipe(unwrap<Record<string, any>>());
+}
 
   // ---------------- B-09 : Master item ----------------
   listMasterItems(group: string): Observable<MasterItem[]> {

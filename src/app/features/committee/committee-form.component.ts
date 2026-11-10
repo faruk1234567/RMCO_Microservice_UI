@@ -7,7 +7,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Observable, catchError, forkJoin, of } from 'rxjs';
 import { EngineApiService } from '../../core/services/engine-api.service';
-import { ConfigAdminService } from '../../core/services/config-admin.service';
+import { ConfigAdminService } from '../config/config-admin.service';
 import { ConfigService } from '../../core/services/config.service';
 import { CommitteeTypeRow, Designation, DynamicField, ScopeNode } from '../../core/models/config-admin.model';
 import { flattenTree, versionsOf } from '../config/config-shared';
@@ -59,10 +59,10 @@ const MOBILE_RE = /^01[3-9]\d{8}$/;
                   @if (!publishedTypes().length) { <div class="muted">কোনো প্রকাশিত ধরন নেই। আগে কনফিগারেশন থেকে ধরন প্রকাশ করুন।</div> }
                 </div>
                 <div class="form-group">
-                  <label>সংস্করণ <span class="required">*</span></label>
+                  <label>নিয়মমালা<span class="required">*</span></label>
                   <select class="form-control" [(ngModel)]="versionId" (ngModelChange)="loadVersion()" [disabled]="!!draftId() || !typeId">
                     <option value="">— বাছাই করুন —</option>
-                    @for (v of pubVersions(); track v.id) { <option [value]="v.id">সংস্করণ {{ v.versionNo }}</option> }
+                    @for (v of pubVersions(); track v.id) { <option [value]="v.id">নিয়মমালা{{ v.versionNo }}</option> }
                   </select>
                 </div>
               </div>
@@ -156,7 +156,7 @@ const MOBILE_RE = /^01[3-9]\d{8}$/;
             <div class="card mb-2"><div class="card-header"><h3>সারসংক্ষেপ</h3></div><div class="card-body">
               <dl class="kv">
                 <dt>কমিটির নাম</dt><dd>{{ form.nameBn }} {{ form.nameEn }}</dd>
-                <dt>ধরন</dt><dd>{{ ver()?.['nameBn'] }} (সংস্করণ {{ ver()?.['versionNo'] }})</dd>
+                <dt>ধরন</dt><dd>{{ ver()?.['nameBn'] }} (নিয়মমালা{{ ver()?.['versionNo'] }})</dd>
                 <dt>কার্যপরিধি</dt><dd>{{ nodeName() }}</dd>
                 <dt>সদস্য</dt><dd>{{ form.members.length }} জন</dd>
                 <dt>প্রস্তাব</dt><dd>{{ form.resolution.number || '—' }} · {{ form.resolution.date || '—' }} · {{ form.resolution.documentId ? 'নথি আছে' : 'নথি নেই' }}</dd>
@@ -219,10 +219,15 @@ export class CommitteeFormComponent implements OnInit {
   mask = maskMobile;
 
   publishedTypes = computed(() => this.types().filter(t => versionsOf(t).some(v => v.status === 'PUBLISHED')));
-  pubVersions = () => {
-    const t = this.types().find(x => x.id === this.typeId);
-    return t ? versionsOf(t).filter(v => v.status === 'PUBLISHED') : [];
-  };
+ pubVersions = () => {
+  const t = this.types().find(x => x.id === this.typeId);
+
+  return t
+    ? versionsOf(t)
+        .filter(v => v.status === 'PUBLISHED')
+        .sort((a, b) => b.versionNo - a.versionNo)
+    : [];
+};
   designationRules = computed<Row[]>(() => this.ver()?.['designations'] ?? []);
   private allFields = computed<DynamicField[]>(() => this.ver()?.['fields'] ?? []);
   committeeFields = computed(() => this.allFields().filter(f => f.target === 'COMMITTEE'));
@@ -249,18 +254,59 @@ export class CommitteeFormComponent implements OnInit {
   }
 
   // ---------------- লোড ----------------
-  ngOnInit() {
-    forkJoin({
-      types: this.cfgAdmin.listTypes(true).pipe(catchError(() => of([] as CommitteeTypeRow[]))),
-      tree: this.cfgAdmin.scopeTree().pipe(catchError(() => of([] as ScopeNode[]))),
-      desig: this.cfg.listDesignations().pipe(catchError(() => of([] as Designation[]))),
-    }).subscribe(({ types, tree, desig }) => {
-      this.types.set(types); this.tree.set(tree); this.designations.set(desig as Designation[]);
-      const draft = this.route.snapshot.queryParamMap.get('draftId');
-      if (draft) this.loadDraft(draft); else this.loading.set(false);
-    });
-  }
+ ngOnInit() {
+  forkJoin({
+    types: this.cfgAdmin.listTypes(true).pipe(
+      catchError(() => of([] as CommitteeTypeRow[]))
+    ),
 
+    levels: this.cfgAdmin.listScopeLevels().pipe(
+      catchError(() => of([] as any[]))
+    ),
+
+    tree: this.cfgAdmin.scopeTree().pipe(
+      catchError(() => of([] as ScopeNode[]))
+    ),
+
+    desig: this.cfg.listDesignations().pipe(
+      catchError(() => of([] as Designation[]))
+    ),
+
+  }).subscribe(({ types, levels, tree, desig }) => {
+
+    // Level ID দিয়ে Level-এর তথ্য খুঁজে বের করা
+    const levelMap = new Map(
+      levels.map((level: any) => [String(level.id), level])
+    );
+
+    // প্রতিটি Node-এর সঙ্গে Level-এর নাম ও নম্বর যুক্ত করা
+    const enrichTree = (nodes: ScopeNode[]): ScopeNode[] => {
+      return nodes.map((node: any) => {
+
+        const level = levelMap.get(String(node.levelId)) as any;
+
+        return {
+          ...node,
+          levelNo: level?.levelNo ?? node.levelNo,
+          levelNameBn: level?.nameBn ?? node.levelNameBn,
+          children: enrichTree(node.children ?? [])
+        };
+      });
+    };
+
+    this.types.set(types);
+    this.tree.set(enrichTree(tree));
+    this.designations.set(desig as Designation[]);
+
+    const draft = this.route.snapshot.queryParamMap.get('draftId');
+
+    if (draft) {
+      this.loadDraft(draft);
+    } else {
+      this.loading.set(false);
+    }
+  });
+}
   /** ⚠ খসড়ার response-এর কাঠামো অনুমান: payload বা সরাসরি field থেকে পড়া হয় */
   private loadDraft(id: string) {
     this.api.getCommittee(id).subscribe({
@@ -282,11 +328,105 @@ export class CommitteeFormComponent implements OnInit {
     });
   }
 
-  onType() { this.versionId = ''; this.ver.set(null); const v = this.pubVersions(); if (v.length) { this.versionId = v[v.length - 1].id; this.loadVersion(); } }
-  loadVersion() {
-    if (!this.versionId) { this.ver.set(null); return; }
-    this.cfgAdmin.getVersion(this.versionId).subscribe({ next: v => this.ver.set(v), error: e => this.err.set(errMsg(e)) });
+ onType() {
+  this.versionId = '';
+  this.ver.set(null);
+  this.err.set('');
+
+  const versions = this.pubVersions();
+
+  if (versions.length > 0) {
+    this.versionId = versions[0].id;
+    this.loadVersion();
   }
+}
+  
+loadVersion() {
+  if (!this.versionId) {
+    this.ver.set(null);
+    return;
+  }
+
+  this.cfgAdmin.getVersion(this.versionId).subscribe({
+    next: (apiVersion: any) => {
+
+      const settings = apiVersion['settings'] ?? {};
+      const composition = apiVersion['composition'] ?? {};
+
+      // Backend ActionCode → Angular RuleKey
+      const actionKeyMap: Record<string, string> = {
+        FORMATION: 'FORMATION',
+        ADD: 'ADD_MEMBER',
+        GO_BACK: 'GO_BACK_MEMBER',
+        REJECT: 'REJECT_MEMBER',
+        RENEW: 'RENEW_TERM',
+        DISSOLVE: 'DISSOLVE'
+      };
+
+      // Backend actionRules → Angular rules
+      const rules: Record<string, any> = {};
+
+      (apiVersion['actionRules'] ?? []).forEach((r: any) => {
+        const key = actionKeyMap[r.actionCode];
+
+        if (key) {
+          rules[key] = {
+            resolutionRequired: r.resolutionRule === 'REQUIRED',
+            approvalRequired: r.approvalRequired === true,
+            approvalRouteId: r.approvalRouteId ?? null
+          };
+        }
+      });
+
+      // Backend designations → C-02 designationRules format
+      const designations = (apiVersion['designations'] ?? []).map((d: any) => ({
+        ...d,
+        designationId: String(
+          d.designationLookupId ?? d.designationId ?? ''
+        ),
+        minCount: d.minCount ?? 0,
+        maxCount: d.maxCount ?? null,
+        mandatory: d.isMandatory ?? false,
+        isSingleHolder: d.isSingleHolder ?? false
+      }));
+
+      // Committee Type name
+      const selectedType = this.types().find(
+        t => t.id === this.typeId
+      );
+
+      // Normalize complete Version for existing C-02 UI
+      const normalizedVersion: Row = {
+        ...apiVersion,
+
+        nameBn: selectedType?.nameBn ?? '',
+        nameEn: selectedType?.nameEn ?? '',
+
+        maxMembers: composition.maxMembers ?? null,
+        minMembers: composition.minMembers ?? null,
+
+        designations,
+
+        rules,
+
+        fields: settings.fields ?? [],
+
+        scopeLevelNos: settings.scopeLevelNos ?? [],
+
+        termMonths: settings.termMonths ?? null
+      };
+
+      this.ver.set(normalizedVersion);
+      this.err.set('');
+    },
+
+    error: e => {
+      this.ver.set(null);
+      this.err.set(errMsg(e));
+    }
+  });
+}
+
 
   // ---------------- সদস্য ----------------
   addMember(desigId: string) {
@@ -405,6 +545,9 @@ export class CommitteeFormComponent implements OnInit {
   }
 
   return new Observable<Row>(sub => {
+    console.log('CREATE DRAFT CALLED');
+console.log('TYPE VERSION ID:', this.versionId);
+console.log('REQUEST PAYLOAD:', payload);
     this.api.createDraft({
       typeVersionId: this.versionId,
       payload: payload
