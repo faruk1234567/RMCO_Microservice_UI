@@ -56,6 +56,19 @@ export class EngineApiService {
   decide(requestId: string, body: { decision: 'APPROVED' | 'REJECTED'; comment?: string }): Observable<Row> {
     return this.http.post(this.workflowApi(`/workflow/requests/${requestId}/decide`), body).pipe(unwrap());
   }
+  // core/services/engine-api.service.ts
+// core/services/engine-api.service.ts
+getApprovalDetailByCommittee(committeeId: string) {
+  return this.http.get<any>(
+    this.workflowApi(`/workflow/approvals/by-committee/${committeeId}/detail`)
+  );
+}
+
+getApprovalDetail(requestId: string) {
+  return this.http.get<any>(
+    this.workflowApi(`/workflow/approvals/${requestId}/detail`)
+  );
+}
 
   // ---------------- Document service ----------------
   uploadDocument(file: File): Observable<Row> {
@@ -73,4 +86,13 @@ export class EngineApiService {
     const params = new HttpParams().set('municipalityId', municipalityId).set('page', page).set('size', size);
     return this.http.get(this.auditApi('/audit/events'), { params }).pipe(unwrap());
   }
+  // ---------------- Identity service ----------------
+searchCitizenByMobile(mobile: string): Observable<Row[]> {
+  const params = new HttpParams().set('mobile', mobile);
+
+  return this.http
+    .get<any>(`${environment.identityUrl}/users/search`, { params })
+    .pipe(unwrap());
+}
+
 }

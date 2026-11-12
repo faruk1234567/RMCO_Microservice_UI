@@ -50,6 +50,7 @@ export interface RuleSetting {
 
 export interface VersionDesignation {
   designationId: string;
+  designationLookupId?: number | null;
   minCount: number;
   maxCount: number | null;
   mandatory: boolean;

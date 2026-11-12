@@ -1,4 +1,3 @@
-
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, OperatorFunction, map } from 'rxjs';
@@ -18,8 +17,37 @@ import {
 } from './config-admin.model';
 
 /**
+ * Config Designation Master
+ *
+ * id                  = Config database UUID
+ * designationLookupId = Identity lookup_item BIGINT
+ */
+export interface ConfigDesignation {
+  id: string;
+  municipalityId?: string;
+  code: string;
+  nameBn: string;
+  nameEn?: string;
+  isActive: boolean;
+  designationLookupId: number | null;
+}
+
+/**
+ * Identity Service-এর lookup (DESIGNATION) আইটেম
+ *
+ * id = Identity lookup_item BIGINT
+ */
+export interface DesignationLookup {
+  id: number;
+  code: string;
+  nameBn: string;
+  nameEn?: string;
+  isActive: boolean;
+}
+
+/**
  * ApiResponse { success, data } হলে data return করে।
- * Interceptor আগে unwrap করলে response 그대로 রাখে।
+ * Interceptor আগে unwrap করলে response অপরিবর্তিত থাকে।
  */
 function unwrap<T>(): OperatorFunction<any, T> {
   return map((r: any) =>
@@ -40,6 +68,13 @@ export class ConfigAdminService {
   private http = inject(HttpClient);
 
   private base = environment.configUrl;
+
+  /**
+   * Identity Service-এর base path (dev proxy অনুযায়ী)।
+   * Network ট্যাবে দেখা URL: /identity-service/api/v1/lookups/DESIGNATION
+   * environment-এ identityUrl থাকলে সেটা ব্যবহার করতে পারেন।
+   */
+  private identityBase = '/identity-service/api/v1';
 
   private url = (p: string) => `${this.base}${p}`;
 
@@ -102,6 +137,89 @@ export class ConfigAdminService {
   }
 
   // =====================================================
+  // Committee Designation Master
+  // Config UUID + Identity Lookup BIGINT
+  // =====================================================
+
+  listDesignations(): Observable<ConfigDesignation[]> {
+    return this.http
+      .get<any>(this.url('/config/designations'))
+      .pipe(
+        unwrap<any>(),
+        map((response: any) => {
+          const rows = Array.isArray(response)
+            ? response
+            : response?.content ?? response?.items ?? [];
+
+          return rows.map((d: any): ConfigDesignation => ({
+            id: String(d.id ?? ''),
+            municipalityId:
+              d.municipalityId != null
+                ? String(d.municipalityId)
+                : d.municipality_id != null
+                  ? String(d.municipality_id)
+                  : '',
+            code: d.code ?? '',
+            nameBn: d.nameBn ?? d.name_bn ?? '',
+            nameEn: d.nameEn ?? d.name_en ?? '',
+            isActive: d.isActive ?? d.is_active ?? false,
+            designationLookupId:
+              d.designationLookupId != null
+                ? Number(d.designationLookupId)
+                : d.designation_lookup_id != null
+                  ? Number(d.designation_lookup_id)
+                  : null
+          }));
+        })
+      );
+  }
+
+  /**
+   * Identity Service থেকে DESIGNATION lookup তালিকা।
+   * রেসপন্সের ফিল্ডের নাম আলাদা হলে নিচের map-এ মিলিয়ে নিন।
+   */
+  listDesignationLookups(): Observable<DesignationLookup[]> {
+    return this.http
+      .get<any>(`${this.identityBase}/lookups/DESIGNATION`)
+      .pipe(
+        unwrap<any>(),
+        map((response: any) => {
+          const rows = Array.isArray(response)
+            ? response
+            : response?.content ?? response?.items ?? [];
+
+          return rows
+            .map((d: any): DesignationLookup => ({
+              id: Number(d.id ?? d.lookupItemId ?? d.lookup_item_id),
+              code: d.code ?? d.itemCode ?? d.item_code ?? '',
+              nameBn:
+                d.nameBn ?? d.name_bn ?? d.labelBn ?? d.name ?? d.label ?? '',
+              nameEn: d.nameEn ?? d.name_en ?? d.labelEn ?? '',
+              isActive: d.isActive ?? d.is_active ?? true
+            }))
+            .filter(
+              (d: DesignationLookup) => Number.isFinite(d.id) && d.isActive
+            );
+        })
+      );
+  }
+
+  /**
+   * Identity lookup-এর পদবীর জন্য Config Master রো নিশ্চিত করে।
+   * Master আগে থেকে থাকলে সেটাই ফেরত দেয়, না থাকলে নতুন বানায়।
+   */
+  ensureDesignation(l: DesignationLookup): Observable<Record<string, any>> {
+    return this.http
+      .post(this.url('/config/designations/ensure'), {
+        designationLookupId: l.id,
+        code: l.code,
+        nameBn: l.nameBn,
+        nameEn: l.nameEn
+      })
+      .pipe(unwrap<Record<string, any>>());
+  }
+
+  // =====================================================
   // B-07 / B-08 : Approval Route
   // =====================================================
 
@@ -117,31 +235,28 @@ export class ConfigAdminService {
       .pipe(unwrap<ApprovalRoute>());
   }
 
-createRoute(body: Record<string, any>): Observable<Record<string, any>> {
-  return this.http
-    .post(this.url('/config/approval-routes'), body)
-    .pipe(unwrap<Record<string, any>>());
-}
+  createRoute(body: Record<string, any>): Observable<Record<string, any>> {
+    return this.http
+      .post(this.url('/config/approval-routes'), body)
+      .pipe(unwrap<Record<string, any>>());
+  }
 
   // =====================================================
   // B-05 / B-06 : Scope Levels & Scope Tree
   // =====================================================
 
-  // Scope Level list
-listScopeLevels(): Observable<ScopeLevel[]> {
-  return this.http
-    .get<any>(this.url('/config/scopes/levels'))
-    .pipe(unwrap<ScopeLevel[]>());
-}
+  listScopeLevels(): Observable<ScopeLevel[]> {
+    return this.http
+      .get<any>(this.url('/config/scopes/levels'))
+      .pipe(unwrap<ScopeLevel[]>());
+  }
 
-  // Scope Tree
- scopeTree(): Observable<ScopeNode[]> {
-  return this.http
-    .get<any>(this.url('/config/scopes/tree'))
-    .pipe(unwrap<ScopeNode[]>());
-}
+  scopeTree(): Observable<ScopeNode[]> {
+    return this.http
+      .get<any>(this.url('/config/scopes/tree'))
+      .pipe(unwrap<ScopeNode[]>());
+  }
 
-  // Create Scope Level
   createLevel(
     nameBn: string,
     nameEn: string,
@@ -158,19 +273,17 @@ listScopeLevels(): Observable<ScopeLevel[]> {
       .pipe(unwrap<Record<string, any>>());
   }
 
-  // Create Scope Node
-
-createNode(body: {
-  levelId: string;
-  parentId: string | null;
-  code: string;
-  nameBn: string;
-  nameEn?: string;
-}): Observable<Record<string, any>> {
-  return this.http
-    .post<any>(this.url('/config/scopes/nodes'), body)
-    .pipe(unwrap<Record<string, any>>());
-}
+  createNode(body: {
+    levelId: string;
+    parentId: string | null;
+    code: string;
+    nameBn: string;
+    nameEn?: string;
+  }): Observable<Record<string, any>> {
+    return this.http
+      .post<any>(this.url('/config/scopes/nodes'), body)
+      .pipe(unwrap<Record<string, any>>());
+  }
 
   // =====================================================
   // B-09 : Master Items
