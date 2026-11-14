@@ -1,17 +1,40 @@
-// D-02 / D-03 : অনুরোধের বিস্তারিত ও সিদ্ধান্ত (Approve / Reject)
+// D-02 / D-03 : অনুরোধের বিস্তারিত ও সিদ্ধান্ত (Approve / Reject) - COMPLETE - FINAL
 // ⚠ অনুরোধের আলাদা GET API নেই, তাই my-pending তালিকা থেকে অনুরোধটি খুঁজে দেখানো হয়
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EngineApiService } from '../../core/services/engine-api.service';
-import { ENGINE_STYLES, Row, STATUS_BN, entries, errMsg, fmtDate, idOf, pick } from '../committee/engine-shared';
+import { ConfigService } from '../../core/services/config.service';
+import { ENGINE_STYLES, Row, STATUS_BN, errMsg, fmtDate, idOf, pick } from '../committee/engine-shared';
+import { MunicipalityCacheService } from '../../core/services/municipality-cache.service';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-workflow-decision',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
-  styles: [ENGINE_STYLES],
+  styles: [ENGINE_STYLES, `
+    .info-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+    .info-card .card-header { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+    .kv { display: grid; grid-template-columns: 160px 1fr; gap: 14px 20px; }
+    .kv dt { font-size: 13px; color: #64748b; font-weight: 500; }
+    .kv dd { margin: 0; font-size: 14px; font-weight: 600; color: #0f172a; }
+    .badge { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
+    .badge-primary { background: #eff6ff; color: #1d4ed8; border-color: #dbeafe; }
+    .badge-success { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
+    .badge-muted { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+    .st { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
+    .st::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .st-PENDING { background: #eff6ff; color: #1d4ed8; border-color: #dbeafe; }
+    .st-APPROVED { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
+    .st-REJECTED { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+    .decision-box { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .decision-option { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; color: #334155; background: #fff; }
+    .decision-option:has(input:checked) { border-color: #1d4ed8; background: #eff6ff; color: #1d4ed8; }
+    .decision-option.reject:has(input:checked) { border-color: #dc2626; background: #fef2f2; color: #b91c1c; }
+    @media (max-width: 640px) { .kv { grid-template-columns: 1fr; gap: 6px; } }
+  `],
   template: `
     <div class="page-container">
       <div class="page-header">
@@ -23,17 +46,23 @@ import { ENGINE_STYLES, Row, STATUS_BN, entries, errMsg, fmtDate, idOf, pick } f
         <div class="alert alert-warn">এই অনুরোধ আপনার অপেক্ষমাণ তালিকায় নেই। হয়তো আগেই সিদ্ধান্ত হয়ে গেছে বা অন্য অনুমোদনকারীর কাছে আছে।</div>
       } @else {
         @if (done()) { <div class="alert alert-ok">{{ done() }} <a routerLink="/workflow">তালিকায় ফিরুন</a></div> }
-
         <div class="card mb-2">
           <div class="card-header"><h3>অনুরোধের তথ্য</h3></div>
           <div class="card-body">
-            <dl class="kv">@for (e of rows(); track e.k) { <dt>{{ e.label }}</dt><dd>{{ e.v }}</dd> }</dl>
+            <dl class="kv">
+              <dt>কমিটি</dt><dd>{{ committeeName() }}</dd>
+              <dt>পৌরসভা</dt><dd>{{ municipalityName() }}</dd>
+              <dt>ধাপ</dt><dd>ধাপ {{ req()!['stepNo'] ?? '—' }}</dd>
+              <dt>অনুমোদক</dt><dd>{{ designationName() }}</dd>
+              <dt>উৎস</dt><dd>কমিটি গঠন</dd>
+              <dt>SLA শেষ হবে</dt><dd>{{ fmt(req()!['slaDeadline']) }}</dd>
+              <dt>অবস্থা</dt><dd><span class="badge badge-primary">{{ bn(req()!['status'] ?? 'PENDING') }}</span></dd>
+            </dl>
             @if (committeeId()) {
               <p style="margin-top:12px"><a class="btn-ghost" style="text-decoration:none" [routerLink]="['/committee', committeeId()]">কমিটির পূর্ণ বিবরণ দেখুন</a></p>
             }
           </div>
         </div>
-
         @if (steps().length) {
           <div class="card mb-2"><div class="card-header"><h3>অনুমোদনের ধাপ</h3></div>
             <div class="card-body table-wrapper">
@@ -43,7 +72,7 @@ import { ENGINE_STYLES, Row, STATUS_BN, entries, errMsg, fmtDate, idOf, pick } f
                   @for (s of steps(); track $index) {
                     <tr>
                       <td>{{ pick(s, 'levelNo', 'stepNo') ?? $index + 1 }}</td>
-                      <td>{{ pick(s, 'approverName', 'approver', 'approverRef') || '—' }}</td>
+                      <td>{{ stepApproverName(s) }}</td>
                       <td>@if (s['status']) { <span [class]="'st st-' + s['status']">{{ bn(s['status']) }}</span> } @else { — }</td>
                       <td>{{ fmt(pick(s, 'decidedAt', 'updatedAt')) }}</td>
                       <td>{{ pick(s, 'comment', 'reason') || '—' }}</td>
@@ -53,13 +82,12 @@ import { ENGINE_STYLES, Row, STATUS_BN, entries, errMsg, fmtDate, idOf, pick } f
               </table>
             </div></div>
         }
-
         @if (!done()) {
           <div class="card"><div class="card-header"><h3>আপনার সিদ্ধান্ত</h3></div>
             <div class="card-body">
-              <div class="row-actions" style="margin-bottom:12px">
-                <label class="check"><input type="radio" name="dec" value="APPROVED" [(ngModel)]="decision" /> অনুমোদন করুন (Approve)</label>
-                <label class="check"><input type="radio" name="dec" value="REJECTED" [(ngModel)]="decision" /> প্রত্যাখ্যান করুন (Reject)</label>
+              <div class="decision-box">
+                <label class="decision-option"><input type="radio" name="dec" value="APPROVED" [(ngModel)]="decision" /> অনুমোদন করুন</label>
+                <label class="decision-option reject"><input type="radio" name="dec" value="REJECTED" [(ngModel)]="decision" /> প্রত্যাখ্যান করুন</label>
               </div>
               <div class="form-group">
                 <label>মন্তব্য @if (decision === 'REJECTED') { <span class="required">* (প্রত্যাখ্যানে কারণ বাধ্যতামূলক)</span> }</label>
@@ -81,6 +109,9 @@ export class WorkflowDecisionComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private api = inject(EngineApiService);
+  private cfg = inject(ConfigService);
+  private munCache = inject(MunicipalityCacheService);
+  private auth = inject(AuthService); // ★ আগে এই লাইনটা ছিল না
 
   req = signal<Row | null>(null);
   loading = signal(true); saving = signal(false);
@@ -89,23 +120,169 @@ export class WorkflowDecisionComponent implements OnInit {
   comment = '';
   private requestId = '';
 
+  committeeName = signal('লোড হচ্ছে...');
+  municipalityName = signal('—');
+  designationName = signal('—');
+  desigMap = signal<Record<string, string>>({});
+
   pick = pick; bn = (s: string) => STATUS_BN[s] ?? s; fmt = (v: any) => fmtDate(v, true);
-  rows = computed(() => entries(this.req()).filter(e => e.k !== 'id'));
   steps = computed<Row[]>(() => this.req()?.['steps'] ?? []);
-  committeeId = computed<string>(() => this.req()?.['committeeId'] ?? this.req()?.['refId'] ?? '');
+  committeeId = computed<string>(() => {
+    const r = this.req();
+    if (!r) return '';
+    return String(r['sourceId'] ?? r['sourceid'] ?? r['committeeId'] ?? r['refId'] ?? '');
+  });
+
   problem(): string {
     if (!this.decision) return 'সিদ্ধান্ত বাছাই করুন।';
     if (this.decision === 'REJECTED' && this.comment.trim().length < 5) return 'প্রত্যাখ্যানের কারণ লিখুন (কমপক্ষে ৫ অক্ষর)।';
     return '';
   }
 
+  stepApproverName(s: Row): string {
+    const direct = pick(s, 'approverName', 'approver', 'approverRef', 'designationName');
+    if (direct && !String(direct).includes('-') && String(direct).length < 50) return String(direct);
+    const id = String(pick(s, 'approverId', 'designationId', 'approver', 'approverRef') ?? '');
+    if (id && this.desigMap()[id]) return this.desigMap()[id];
+    if (direct) return String(direct);
+    return '—';
+  }
+
   ngOnInit() {
     this.requestId = this.route.snapshot.paramMap.get('id') ?? '';
+    this.cfg.listDesignations().subscribe({
+      next: (l: any[]) => {
+        const map: Record<string, string> = {};
+        for (const d of (l ?? [])) map[String(d.id)] = String(d.nameBn ?? d.name ?? '');
+        this.desigMap.set(map);
+      },
+      error: () => {},
+    });
     this.api.myPending().subscribe({
-      next: (l) => { this.req.set((l ?? []).find(r => idOf(r) === this.requestId) ?? null); this.loading.set(false); },
+      next: (l) => {
+        const found = (l ?? []).find(r => idOf(r) === this.requestId) ?? null;
+        this.req.set(found);
+        this.loading.set(false);
+        if (found) this.loadNames(found);
+      },
       error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
     });
   }
+
+  private loadNames(r: Row) {
+    const committeeId = String(r['sourceId'] ?? r['sourceid'] ?? '');
+    if (committeeId) {
+      this.api.getCommittee(committeeId).subscribe({
+        next: (c: any) => {
+          const name = pick(c, 'nameBn', 'name', 'committeeName') ?? pick(c?.['data'], 'nameBn', 'name') ?? pick(c?.['payload'], 'nameBn', 'name');
+          this.committeeName.set(name ? String(name) : 'কমিটি');
+        },
+        error: () => this.committeeName.set('কমিটি'),
+      });
+    } else {
+      this.committeeName.set('কমিটি');
+    }
+    this.loadMunicipalityFromDetail();
+    const approverId = String(r['approverId'] ?? r['designationId'] ?? r['approverDesignationId'] ?? r['approverRef'] ?? '');
+    if (approverId) {
+      this.cfg.listDesignations().subscribe({
+        next: (list: any[]) => {
+          const des = (list ?? []).find((x: any) => String(x.id) === approverId);
+          if (des) this.designationName.set(String(des.nameBn ?? des.name ?? '—'));
+          else if (r['approverKind'] === 'DESIGNATION') this.designationName.set('পদভিত্তিক অনুমোদক');
+        },
+        error: () => {},
+      });
+    } else if (r['approverKind'] === 'DESIGNATION') {
+      this.designationName.set('পদভিত্তিক অনুমোদক');
+    }
+  }
+
+  // ★ পৌরসভার নাম - my-pending + Committee + AuthService + Cache থেকে
+  // ❌ getApprovalDetail কল হবে না (404), ❌ municipalities কল হবে না (403)
+private loadMunicipalityFromDetail() {
+  const r = this.req();
+  if (!r) return;
+
+  console.log('[Decision] loadMunicipality - ensureLoaded call করছি');
+  // ★ Cache খালি হলে আগে municipalities এনে ভরো, তারপর নাম খোঁজো
+  this.munCache.ensureLoaded().subscribe({
+    next: () => {
+      console.log('[Decision] ensureLoaded DONE, cache:', this.munCache.getName('15'));
+      this.resolveMunicipalityName();
+    },
+    error: () => this.resolveMunicipalityName(),
+  });
+}
+
+private resolveMunicipalityName() {
+  const r = this.req();
+  if (!r) return;
+  const fromRowId = this.deepFind(r, ['municipalityId', 'municipality_id']);
+  const fromRowName = this.deepFind(r, ['municipalityName', 'municipalityNameBn', 'municipalityNameEn']);
+  if (fromRowName) { this.municipalityName.set(String(fromRowName)); this.err.set(''); return; }
+  if (fromRowId) {
+    const cached = this.munCache.getName(String(fromRowId));
+    if (cached) { this.municipalityName.set(cached); this.err.set(''); return; }
+  }
+  const committeeId = String(r['sourceId'] ?? r['sourceid'] ?? '');
+  if (!committeeId) { this.showMunNotFound(fromRowId); return; }
+  this.api.getCommittee(committeeId).subscribe({
+    next: (c: any) => {
+      const fromComName = this.deepFind(c, ['municipalityName', 'municipalityNameBn', 'municipalityNameEn']);
+      const fromComId = this.deepFind(c, ['municipalityId', 'municipality_id']);
+      if (fromComName) { this.municipalityName.set(String(fromComName)); this.err.set(''); return; }
+      if (fromComId) {
+        const cached = this.munCache.getName(String(fromComId));
+        if (cached) { this.municipalityName.set(cached); this.err.set(''); return; }
+      }
+      this.showMunNotFound(fromComId ?? fromRowId);
+    },
+    error: () => this.showMunNotFound(fromRowId),
+  });
+}
+
+// ★ আগের loadMunicipalityFromDetail এর বাকি কোডটা এই নামে রাখেন
+
+
+  private deepFind(obj: any, keys: string[]): any {
+    if (!obj || typeof obj !== 'object') return null;
+    for (const k of keys) if (obj[k] != null && obj[k] !== '') return obj[k];
+    for (const v of Object.values(obj)) {
+      if (v && typeof v === 'object') {
+        const found = this.deepFind(v, keys);
+        if (found != null && found !== '') return found;
+      }
+    }
+    return null;
+  }
+
+  private showMunNotFound(munId: any) {
+    const id = String(munId ?? '').trim();
+    if (id) {
+      const cached = this.munCache.getName(id);
+      if (cached) { this.municipalityName.set(cached); return; }
+    }
+    // ★ AuthService থেকে - Login User এর municipalityId দিয়ে Cache থেকে নাম
+    const userMunName = this.getCurrentUserMunicipalityName();
+    if (userMunName) { this.municipalityName.set(userMunName); return; }
+    this.municipalityName.set('—');
+  }
+
+  // ★ AuthService এ শুধু municipalityId: 15 থাকে, নাম থাকে না
+  // ★ নামটা List পেজের Cache (municipalities API) থেকে নিতে হবে
+  private getCurrentUserMunicipalityName(): string | null {
+  try {
+    const user = this.auth.currentUser();
+    if (!user) { console.log('[Decision] no user'); return null; }
+    const munId = String((user as any).municipalityId ?? '').trim();
+    console.log('[Decision] user municipalityId:', munId);
+    if (!munId) return null;
+    const name = this.munCache.getName(munId);
+    console.log('[Decision] cache name:', name);
+    return name;
+  } catch { return null; }
+}
 
   submit() {
     if (!this.decision) return;

@@ -235,11 +235,24 @@ export class AuthService {
     return this.http.post<any>(`${this.base}/register/check-mobile`, { mobile });
   }
 
+  // ─── PATCHED: OTP Purpose Forward — COMMITTEE_MEMBER fix ───
+  // আগে: purpose Parameter টা ঠিকমতো যাইতো, কিন্তু case-sensitive ছিল।
+  // এখন: trim + UPPERCASE করে পাঠাই — 'committee_member' আসলেও Backend 'COMMITTEE_MEMBER' পাবে।
+  // Hardcoded REGISTRATION নাই — যেই Purpose আসবে ওইটাই যাবে।
+  // Committee Form থেকে 'COMMITTEE_MEMBER' আসলে ওইটাই যাবে, REGISTRATION যাবে না।
+  private normalizePurpose(purpose?: string): string {
+    const p = (purpose || 'REGISTRATION').trim().toUpperCase();
+    return p || 'REGISTRATION';
+  }
+
   /** POST /register/send-otp */
   requestOtp(mobile: string, purpose = 'REGISTRATION'): Observable<any> {
+    const normalized = this.normalizePurpose(purpose);
+    // Debug: Network → Payload এ purpose কী যাইতেছে, Console এ দেখা যাবে
+    console.log('[AuthService] send-otp →', { mobile, purpose: normalized });
     return this.http.post<any>(`${this.base}/register/send-otp`, {
       mobile,
-      purpose,
+      purpose: normalized,
       language: 'BN',
     });
   }
@@ -250,10 +263,12 @@ export class AuthService {
     otp: string,
     purpose = 'REGISTRATION'
   ): Observable<any> {
+    const normalized = this.normalizePurpose(purpose);
+    console.log('[AuthService] verify-otp →', { mobile, purpose: normalized });
     return this.http.post<any>(`${this.base}/register/verify-otp`, {
       mobile,
       otp,
-      purpose,
+      purpose: normalized,
     });
   }
 

@@ -44,22 +44,22 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
 
       .info-card {
         background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
         overflow: hidden;
       }
 
       .info-card-header {
         padding: 16px 20px;
-        border-bottom: 1px solid #e5e7eb;
-        background: #f9fafb;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
       }
 
       .info-card-header h3 {
         margin: 0;
         font-size: 16px;
         font-weight: 600;
-        color: #111827;
+        color: #0f172a;
       }
 
       .info-card-body {
@@ -80,13 +80,15 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
       }
 
       .info-label {
-        color: #6b7280;
-        font-size: 13px;
-        font-weight: 500;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
       }
 
       .info-value {
-        color: #111827;
+        color: #0f172a;
         font-size: 14px;
         font-weight: 600;
         overflow-wrap: anywhere;
@@ -106,8 +108,9 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
         height: 28px;
         padding: 0 10px;
         border-radius: 6px;
-        background: #eff6ff;
-        color: #1d4ed8;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #334155;
         font-weight: 600;
         font-size: 13px;
       }
@@ -118,94 +121,165 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
         gap: 18px 30px;
       }
 
-      /* APPROVAL TIMELINE */
+      /* --- Professional Badge --- */
+      .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.4; border: 1px solid transparent; white-space: nowrap; }
+      .badge-success { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
+      .badge-primary { background: #eff6ff; color: #1d4ed8; border-color: #dbeafe; }
+      .badge-danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+      .badge-muted { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+
+      /* --- Status Pill with Dot --- */
+      .st { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
+      .st::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+      .st-DRAFT { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+      .st-SUBMITTED, .st-UNDER_APPROVAL, .st-IN_APPROVAL, .st-IN_PROGRESS { background: #eff6ff; color: #1d4ed8; border-color: #dbeafe; }
+      .st-ACTIVE, .st-APPROVED { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
+      .st-REJECTED { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+      .st-CANCELLED { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+
+      /* APPROVAL TIMELINE - PROFESSIONAL */
       .approval-card {
         background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
         margin-bottom: 20px;
         overflow: hidden;
       }
 
       .approval-header {
         padding: 16px 20px;
-        border-bottom: 1px solid #e5e7eb;
-        background: #f9fafb;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
       }
 
       .approval-header h3 {
         margin: 0;
         font-size: 16px;
         font-weight: 600;
-        color: #111827;
+        color: #0f172a;
       }
 
       .approval-body {
         padding: 20px;
       }
 
+      .approval-summary-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
       .progress-bar {
-        height: 10px;
-        background: #e5e7eb;
-        border-radius: 5px;
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 999px;
         overflow: hidden;
-        margin: 8px 0 16px;
+        margin: 10px 0 16px;
       }
 
       .progress-fill {
         height: 100%;
-        background: #22c55e;
+        background: #1d4ed8;
+        border-radius: 999px;
         transition: width 0.3s;
+      }
+
+      .progress-fill.done {
+        background: #059669;
+      }
+
+      .progress-fill.rejected {
+        background: #dc2626;
       }
 
       .timeline-item {
         display: flex;
-        gap: 12px;
-        padding: 14px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
+        gap: 14px;
+        padding: 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
         margin-bottom: 10px;
+        background: #fff;
       }
 
       .timeline-item.approved {
-        background: #f0fdf4;
-        border-color: #bbf7d0;
+        border-left: 3px solid #059669;
       }
 
       .timeline-item.current {
-        background: #fffbeb;
-        border-color: #fcd34d;
-      }
-
-      .timeline-item.pending {
+        border-left: 3px solid #1d4ed8;
         background: #f8fafc;
       }
 
-      .timeline-item.rejected {
-        background: #fef2f2;
-        border-color: #fecaca;
+      .timeline-item.pending {
+        border-left: 3px solid #e2e8f0;
       }
 
-      .timeline-icon {
-        font-size: 22px;
+      .timeline-item.rejected {
+        border-left: 3px solid #dc2626;
+      }
+
+      .timeline-item.cancelled {
+        border-left: 3px solid #cbd5e1;
+        background: #f8fafc;
+        opacity: 0.85;
+      }
+
+      .timeline-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #cbd5e1;
+        margin-top: 6px;
         flex-shrink: 0;
       }
+
+      .timeline-item.approved .timeline-dot { background: #059669; }
+      .timeline-item.current .timeline-dot { background: #1d4ed8; box-shadow: 0 0 0 4px #dbeafe; }
+      .timeline-item.rejected .timeline-dot { background: #dc2626; }
+      .timeline-item.cancelled .timeline-dot { background: #94a3b8; }
 
       .timeline-content {
         flex: 1;
         min-width: 0;
       }
 
+      .step-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
       .decision-meta {
         font-size: 13px;
         color: #475569;
-        margin-top: 4px;
+        margin-top: 8px;
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 4px;
+        line-height: 1.6;
+      }
+
+      .decision-meta b { color: #0f172a; font-weight: 600; }
+
+      .comment-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-left: 3px solid #94a3b8;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-size: 13px;
+        color: #334155;
+        margin-top: 8px;
       }
 
       @media (max-width: 768px) {
@@ -236,8 +310,8 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
             {{ title() }}
 
             @if (c()) {
-              <span [class]="'st st-' + c()!['status']">
-                {{ bn(c()!['status']) }}
+              <span [class]="'st st-' + effectiveStatus()">
+                {{ bn(effectiveStatus()) }}
               </span>
             }
           </h1>
@@ -272,7 +346,17 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
       @else if (c()) {
 
         <!-- STATUS MESSAGES -->
-        @if (
+        @if (isRejected()) {
+          <div class="alert alert-err">
+            এই কমিটি প্রত্যাখ্যাত হয়েছে।
+            @if (rejectedStep(); as rs) {
+              ধাপ {{ rs.stepNo }} এ প্রত্যাখ্যাত।
+            }
+            @if (rejectReason()) {
+              কারণ: {{ rejectReason() }}
+            }
+          </div>
+        } @else if (
           c()!['status'] === 'SUBMITTED' ||
           c()!['status'] === 'UNDER_APPROVAL'
         ) {
@@ -282,18 +366,8 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
           </div>
         }
 
-        @if (c()!['status'] === 'REJECTED') {
-          <div class="alert alert-err">
-            এই কমিটি প্রত্যাখ্যাত হয়েছে।
-
-            @if (rejectReason()) {
-              কারণ: {{ rejectReason() }}
-            }
-          </div>
-        }
-
         <!-- APPROVAL PROGRESS -->
-        @if (c()!['status'] === 'SUBMITTED' || c()!['status'] === 'UNDER_APPROVAL' || c()!['status'] === 'APPROVED' || c()!['status'] === 'REJECTED') {
+        @if (c()!['status'] === 'SUBMITTED' || c()!['status'] === 'UNDER_APPROVAL' || c()!['status'] === 'APPROVED' || c()!['status'] === 'REJECTED' || isRejected()) {
           <div class="approval-card">
             <div class="approval-header">
               <h3>অনুমোদনের অগ্রগতি</h3>
@@ -308,44 +382,65 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
                 <div class="muted">অনুমোদনের তথ্য লোড হচ্ছে...</div>
               } @else {
                 @if (approvalDetail(); as d) {
-                  <div><strong>ধাপ {{ approvedCount() }} / {{ d.totalSteps }} সম্পন্ন</strong></div>
-                  <div class="progress-bar"><div class="progress-fill" [style.width.%]="approvedCount() / d.totalSteps * 100"></div></div>
+                  <div class="approval-summary-top">
+                    <div><strong>ধাপ {{ approvedCount() }} / {{ d.totalSteps }} সম্পন্ন</strong></div>
+                    @if (isRejected()) {
+                      <span class="badge badge-danger">প্রত্যাখ্যাত</span>
+                    } @else if (approvedCount() === d.totalSteps) {
+                      <span class="badge badge-success">সম্পূর্ণ অনুমোদিত</span>
+                    } @else if (approvedCount() === 0) {
+                      <span class="badge badge-muted">অনুমোদন শুরু হয়নি</span>
+                    } @else {
+                      <span class="badge badge-primary">{{ approvedCount() }} ধাপ সম্পন্ন</span>
+                    }
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill" [class.done]="approvedCount() === d.totalSteps && !isRejected()" [class.rejected]="isRejected()" [style.width.%]="progressPercent()"></div></div>
+                  <div class="muted" style="font-size:13px; margin-bottom:16px">
+                    @if (isRejected()) { ধাপ {{ rejectedStep()!.stepNo }} এ প্রত্যাখ্যাত — পরের ধাপগুলো বাতিল }
+                    @else if (approvedCount() === d.totalSteps) { সকল ধাপ অনুমোদিত }
+                    @else if (approvedCount() === 0) { প্রথম ধাপের অপেক্ষায় }
+                    @else { ধাপ {{ approvedCount() }} অনুমোদিত — ধাপ {{ approvedCount() + 1 }} চলমান }
+                  </div>
 
                   @for (s of d.steps; track s.stepNo) {
                     <div class="timeline-item"
-                      [class.approved]="s.decision === 'APPROVED'"
-                      [class.current]="s.isCurrentStep"
-                      [class.rejected]="s.decision === 'REJECTED'"
-                      [class.pending]="s.decision === 'PENDING' && !s.isCurrentStep">
-                      <div class="timeline-icon">
-                        @if (s.decision === 'APPROVED') { ✅ }
-                        @else if (s.decision === 'REJECTED') { ❌ }
-                        @else { ⏳ }
-                      </div>
+                      [class.approved]="displayStatus(s) === 'APPROVED'"
+                      [class.current]="displayStatus(s) === 'PENDING' && s.isCurrentStep && !isRejected()"
+                      [class.rejected]="displayStatus(s) === 'REJECTED'"
+                      [class.cancelled]="displayStatus(s) === 'CANCELLED'"
+                      [class.pending]="displayStatus(s) === 'PENDING' && !s.isCurrentStep">
+                      <div class="timeline-dot"></div>
                       <div class="timeline-content">
-                        <div>
-                          <strong>ধাপ {{ s.stepNo }}: {{ s.designationName }}</strong>
-                          @if (s.isCurrentStep) {
-                            <span class="st st-IN_PROGRESS" style="margin-left:8px">বর্তমান ধাপ</span>
-                          }
+                        <div class="step-head">
+                          <div>
+                            <strong>ধাপ {{ s.stepNo }}: {{ stepDesignationName(s) }}</strong>
+                          </div>
+                          @if (displayStatus(s) === 'APPROVED') { <span class="badge badge-success">অনুমোদিত</span> }
+                          @else if (displayStatus(s) === 'REJECTED') { <span class="badge badge-danger">প্রত্যাখ্যাত</span> }
+                          @else if (displayStatus(s) === 'CANCELLED') { <span class="badge badge-muted">বাতিল</span> }
+                          @else if (s.isCurrentStep && !isRejected()) { <span class="badge badge-primary">বর্তমান ধাপ</span> }
+                          @else { <span class="badge badge-muted">অপেক্ষায়</span> }
                         </div>
 
-                        @if (s.decision === 'APPROVED') {
+                        @if (displayStatus(s) === 'APPROVED') {
                           <div class="decision-meta">
-                            <span>✅ <strong>অনুমোদিত</strong></span>
-                            <span>দ্বারা: {{ s.decidedByName ?? s.decidedBy ?? '—' }}</span>
-                            <span>তারিখ: {{ fmt(s.decidedAt) }}</span>
-                            @if (s.comment) { <span>মন্তব্য: {{ s.comment }}</span> }
+                            <span><b>সিদ্ধান্ত দিয়েছেন:</b> {{ decidedByName(s) }}</span>
+                            <span><b>তারিখ:</b> {{ fmt(s.decidedAt) }}</span>
                           </div>
-                        } @else if (s.decision === 'REJECTED') {
+                          @if (s.comment) { <div class="comment-box">{{ s.comment }}</div> }
+                        } @else if (displayStatus(s) === 'REJECTED') {
                           <div class="decision-meta">
-                            <span>❌ <strong>প্রত্যাখ্যাত</strong></span>
-                            <span>দ্বারা: {{ s.decidedByName ?? s.decidedBy ?? '—' }}</span>
-                            <span>কারণ: {{ s.comment ?? '—' }}</span>
+                            <span><b>সিদ্ধান্ত দিয়েছেন:</b> {{ decidedByName(s) }}</span>
+                            <span><b>তারিখ:</b> {{ fmt(s.decidedAt) }}</span>
+                          </div>
+                          @if (s.comment) { <div class="comment-box">{{ s.comment }}</div> }
+                        } @else if (displayStatus(s) === 'CANCELLED') {
+                          <div class="decision-meta">
+                            <span>আগের ধাপ প্রত্যাখ্যাত হওয়ায় এই ধাপ বাতিল হয়ে গেছে।</span>
                           </div>
                         } @else {
                           <div class="decision-meta">
-                            <span>⏳ অনুমোদনের অপেক্ষায়</span>
+                            <span>অনুমোদনের অপেক্ষায়</span>
                             @if (s.isCurrentStep) { <span>এই ধাপের অনুমোদকের কাছে এখন আছে</span> }
                           </div>
                         }
@@ -688,8 +783,8 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
                       </span>
 
                       <span class="info-value">
-                        <span [class]="'st st-' + c()?.['status']">
-                          {{ bn(c()?.['status'] ?? '') }}
+                        <span [class]="'st st-' + effectiveStatus()">
+                          {{ bn(effectiveStatus()) }}
                         </span>
                       </span>
                     </div>
@@ -811,6 +906,7 @@ export class CommitteeDetailComponent implements OnInit {
   c = signal<Row | null>(null);
   doc = signal<Row | null>(null);
   desigMap = signal<Record<string, string>>({});
+  userNameMap = signal<Record<string, string>>({});
   tab = signal<Tab>('summary');
   loading = signal(true);
   docLoading = signal(false);
@@ -822,13 +918,40 @@ export class CommitteeDetailComponent implements OnInit {
   approvalError = signal('');
 
   approvedCount = computed(() =>
-    (this.approvalDetail()?.steps ?? []).filter((s: any) => s.decision === 'APPROVED').length
+    (this.approvalDetail()?.steps ?? []).filter((s: any) => this.norm(s.decision) === 'APPROVED').length
   );
+
+  // ★ Reject ধাপ — কোনো ধাপ REJECTED হলেই পুরা approval REJECTED
+  rejectedStep = computed(() =>
+    (this.approvalDetail()?.steps ?? []).find((s: any) => this.norm(s.decision) === 'REJECTED') ?? null
+  );
+
+  isRejected = computed(() =>
+    !!this.rejectedStep() || String(this.c()?.['status'] ?? '').toUpperCase() === 'REJECTED'
+  );
+
+  // ★ Committee-র আসল অবস্থা — Backend এ status পুরনো থাকলেও approval Reject হলে REJECTED দেখাবে
+  effectiveStatus = computed(() => {
+    if (this.isRejected()) return 'REJECTED';
+    return String(this.c()?.['status'] ?? '');
+  });
+
+  // ★ Progress % — Reject হলে Approved যতটুকু ততটুকুই, বাকিটা লাল
+  progressPercent = computed(() => {
+    const d = this.approvalDetail();
+    const total = Number(d?.totalSteps ?? d?.steps?.length ?? 0);
+    if (!total) return 0;
+    return (this.approvedCount() / total) * 100;
+  });
 
   pick = pick;
   fmt = (v: any) => fmtDate(v);
   mask = maskMobile;
-  bn = (s: string) => STATUS_BN[s] ?? s;
+  bn = (s: string) => {
+    const k = String(s ?? '').toUpperCase();
+    if (k === 'CANCELLED') return 'বাতিল';
+    return STATUS_BN[s] ?? STATUS_BN[k] ?? s;
+  };
 
   body = computed<Row>(() =>
     this.c()?.['payload'] ?? this.c() ?? {}
@@ -883,7 +1006,7 @@ export class CommitteeDetailComponent implements OnInit {
       return [];
     }
 
-    const status = String(committee['status'] ?? '');
+    const status = this.effectiveStatus();
 
     return [
 
@@ -981,7 +1104,7 @@ export class CommitteeDetailComponent implements OnInit {
       'rejectReason',
       'rejectionReason',
       'comment'
-    )
+    ) ?? this.rejectedStep()?.comment ?? ''
   );
 
   docUrl = computed(() =>
@@ -1080,19 +1203,59 @@ export class CommitteeDetailComponent implements OnInit {
   }
 
   desigOf(m: Row): string {
+    // ★ Member এর designationName এ UUID থাকলে Map থেকে নাম নেবে
+    const rawName = pick(m, 'designationName', 'designationNameBn');
+    if (rawName && !this.isUuid(rawName)) return String(rawName);
+    if (rawName && this.isUuid(rawName)) {
+      const fromMap = this.desigMap()[String(rawName)];
+      if (fromMap) return fromMap;
+    }
+    return this.desigMap()[String(m['designationId'])] ?? '—';
+  }
 
-    return (
-      pick(
-        m,
-        'designationName',
-        'designationNameBn'
-      ) ??
+  // ★ Decision normalize — APPROVED / REJECTED / PENDING / CANCELLED
+  norm(v: any): string {
+    return String(v ?? '').trim().toUpperCase();
+  }
 
-      this.desigMap()[String(m['designationId'])] ??
+  // ★ UUID কিনা চেনা
+  isUuid(v: any): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v ?? '').trim());
+  }
 
-      '—'
+  // ★ ধাপের পদবীর নাম — Backend ID পাঠালেও desigMap থেকে নাম
+  stepDesignationName(s: any): string {
+    const raw = s?.designationName ?? s?.designationId ?? s?.designation ?? '';
+    if (raw && !this.isUuid(raw)) return String(raw);
+    const fromMap = this.desigMap()[String(raw)] ?? this.desigMap()[String(s?.designationId)];
+    if (fromMap) return fromMap;
+    return '—';
+  }
+
+  // ★ সিদ্ধান্তকারীর নাম — UUID কখনো দেখাবে না
+  decidedByName(s: any): string {
+    const rawName = s?.decidedByName ?? s?.decidedByUserName ?? s?.approverName ?? '';
+    if (rawName && !this.isUuid(rawName)) return String(rawName);
+    const id = String(s?.decidedBy ?? s?.decidedById ?? s?.approverId ?? '').trim();
+    if (!id) return '—';
+    // ১. এই কমিটির Member List থেকে খোঁজা
+    const fromMember = this.members().find((m: any) =>
+      String(m['userId'] ?? m['user_id'] ?? m['id'] ?? '') === id
     );
+    if (fromMember) return this.memberName(fromMember);
+    // ২. User Map থেকে (Identity User Lookup থাকলে এখানে ভরবে)
+    const fromUserMap = this.userNameMap()[id];
+    if (fromUserMap) return fromUserMap;
+    return '—';
+  }
 
+  // ★ একটা ধাপের দেখানোর Status — Backend এ PENDING থাকলেও Reject এর পরের ধাপ CANCELLED
+  displayStatus(s: any): string {
+    const raw = this.norm(s?.decision ?? s?.status);
+    if (raw === 'APPROVED' || raw === 'REJECTED' || raw === 'CANCELLED') return raw;
+    const rs = this.rejectedStep();
+    if (rs && Number(s?.stepNo) > Number(rs.stepNo)) return 'CANCELLED';
+    return 'PENDING';
   }
 
   ngOnInit(): void {

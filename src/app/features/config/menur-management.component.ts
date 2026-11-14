@@ -1,4 +1,3 @@
-
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -16,221 +15,188 @@ import { AuthService } from '../../core/services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="page-container">
-      <div class="page-header">
-        <h1>Menu ও Submenu ব্যবস্থাপনা</h1>
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <h1>মেনু ও সাবমেনু ব্যবস্থাপনা</h1>
+          <p class="sub">উপরের মেনু বারে কোন মেনু দেখা যাবে, তা এখান থেকে ঠিক করুন।</p>
+        </div>
+        <div class="stat"><strong>{{ menus().length }}</strong><span>টি মূল মেনু</span></div>
       </div>
 
       @if (!isPlatformUser()) {
-        <div class="alert alert-danger">
-          শুধু Platform User Menu ও Submenu তৈরি করতে পারবেন।
-        </div>
+        <div class="alert error">শুধু Platform User মেনু ও সাবমেনু তৈরি করতে পারবেন।</div>
       } @else {
         @if (errorMsg()) {
-          <div class="alert alert-danger">{{ errorMsg() }}</div>
+          <div class="alert error">{{ errorMsg() }}<button class="x" type="button" (click)="errorMsg.set('')">×</button></div>
         }
-
         @if (successMsg()) {
-          <div class="alert alert-success">{{ successMsg() }}</div>
+          <div class="alert success">{{ successMsg() }}<button class="x" type="button" (click)="successMsg.set('')">×</button></div>
         }
 
-        <div class="card">
-          <div class="card-body">
-            <h3>নতুন Menu / Submenu তৈরি</h3>
-
-            <div class="form-group">
-              <label>তৈরির ধরন</label>
-              <select class="form-control" [(ngModel)]="creationType">
-                <option value="MENU">মূল Menu</option>
-                <option value="SUBMENU">Submenu</option>
-              </select>
-            </div>
-
-            @if (creationType === 'SUBMENU') {
-              <div class="form-group">
-                <label>Parent Menu নির্বাচন করুন *</label>
-                <select
-                  class="form-control"
-                  [(ngModel)]="parentId"
-                  name="parentId"
-                >
-                  <option [ngValue]="null">-- Menu নির্বাচন করুন --</option>
-                  @for (menu of rootMenus(); track menu.id) {
-                    <option [ngValue]="menu.id">
-                      {{ menu.labelBn }} ({{ menu.code }})
-                    </option>
-                  }
-                </select>
+        <div class="layout">
+          <!-- LEFT : FORM -->
+          <section class="card form-card">
+            <div class="card-head"><strong>নতুন মেনু / সাবমেনু তৈরি</strong><span class="step">ধাপ ১ → ২ → ৩</span></div>
+            <div class="card-body">
+              <label class="lbl">১. কোথায় তৈরি করবেন?</label>
+              <div class="seg">
+                <button type="button" [class.on]="creationType === 'MENU'" (click)="creationType = 'MENU'">মূল মেনু<small>উপরে সরাসরি দেখা যাবে</small></button>
+                <button type="button" [class.on]="creationType === 'SUBMENU'" (click)="creationType = 'SUBMENU'">সাবমেনু<small>কোনো মেনুর ভেতরে থাকবে</small></button>
               </div>
-            }
 
-            <div class="form-group">
-              <label>Menu Code *</label>
-              <input
-                class="form-control"
-                [(ngModel)]="code"
-                name="code"
-                placeholder="যেমন: REPORT_MENU"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>বাংলা নাম *</label>
-              <input
-                class="form-control"
-                [(ngModel)]="labelBn"
-                name="labelBn"
-                placeholder="বাংলা নাম লিখুন"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>ইংরেজি নাম *</label>
-              <input
-                class="form-control"
-                [(ngModel)]="labelEn"
-                name="labelEn"
-                placeholder="English name"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>Route Path</label>
-              <input
-                class="form-control"
-                [(ngModel)]="routePath"
-                name="routePath"
-                placeholder="/reports"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>Icon</label>
-              <input
-                class="form-control"
-                [(ngModel)]="icon"
-                name="icon"
-                placeholder="bar-chart"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>Required Permission Code</label>
-              <input
-                class="form-control"
-                [(ngModel)]="requiredPermissionCode"
-                name="requiredPermissionCode"
-                placeholder="যেমন: report.view"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>ক্রম (Sort Order)</label>
-              <input
-                class="form-control"
-                type="number"
-                [(ngModel)]="sortOrder"
-                name="sortOrder"
-              />
-            </div>
-
-            <div class="form-group">
-              <label>
-                <input
-                  type="checkbox"
-                  [(ngModel)]="isActive"
-                  name="isActive"
-                />
-                সক্রিয় রাখুন
-              </label>
-            </div>
-
-            <button
-              class="btn btn-primary"
-              [disabled]="saving()"
-              (click)="create()"
-            >
-              {{
-                saving()
-                  ? 'সংরক্ষণ হচ্ছে...'
-                  : creationType === 'MENU'
-                    ? 'Menu তৈরি করুন'
-                    : 'Submenu তৈরি করুন'
-              }}
-            </button>
-
-            <button
-              class="btn btn-secondary"
-              style="margin-left:8px"
-              (click)="resetForm()"
-            >
-              ফর্ম পরিষ্কার
-            </button>
-          </div>
-        </div>
-
-        <div class="card" style="margin-top:16px">
-          <div class="card-body">
-            <h3>বর্তমান Menu Tree</h3>
-
-            @if (loading()) {
-              <p>Menu লোড হচ্ছে...</p>
-            } @else {
-              <ul class="menu-tree">
-                @for (menu of rootMenus(); track menu.id) {
-                  <li>
-                    <strong>{{ menu.labelBn }}</strong>
-                    <code>{{ menu.code }}</code>
-
-                    @if (menu.children?.length) {
-                      <ul>
-                        @for (child of menu.children; track child.id) {
-                          <li>
-                            {{ child.labelBn }}
-                            <code>{{ child.code }}</code>
-                          </li>
-                        }
-                      </ul>
+              @if (creationType === 'SUBMENU') {
+                <div class="form-group">
+                  <label>কোন মেনুর ভেতরে? *</label>
+                  <select class="form-control" [(ngModel)]="parentId" name="parentId">
+                    <option [ngValue]="null">-- মেনু নির্বাচন করুন --</option>
+                    @for (menu of rootMenus(); track menu.id) {
+                      <option [ngValue]="menu.id">{{ menu.labelBn }}</option>
                     }
-                  </li>
-                } @empty {
-                  <li>কোনো Menu পাওয়া যায়নি।</li>
-                }
-              </ul>
-            }
+                  </select>
+                  <small class="hint">উপরে যে মেনুটা বাছবেন, নতুন সাবমেনু তার ভেতরে যাবে।</small>
+                </div>
+              }
 
-            <button
-              class="btn btn-secondary"
-              [disabled]="loading()"
-              (click)="loadMenus()"
-            >
-              Refresh
-            </button>
-          </div>
+              <label class="lbl">২. নাম</label>
+              <div class="form-group">
+                <label>বাংলা নাম *</label>
+                <input class="form-control" [(ngModel)]="labelBn" name="labelBn" placeholder="যেমন: কমিটি ব্যবস্থাপনা" />
+              </div>
+              <div class="form-group">
+                <label>ইংরেজি নাম *</label>
+                <input class="form-control" [(ngModel)]="labelEn" name="labelEn" placeholder="Committee Management" />
+              </div>
+              <div class="form-group">
+                <label>মেনু কোড *</label>
+                <input class="form-control mono" [(ngModel)]="code" name="code" placeholder="যেমন: COMMITTEE_MENU" />
+                <small class="hint">কোড একবার দিলে পরে বদলাবেন না।</small>
+              </div>
+
+              <label class="lbl">৩. ক্লিক করলে কোথায় যাবে?</label>
+              <div class="row2">
+                <div class="form-group">
+                  <label>পেজের পথ (Route)</label>
+                  <input class="form-control mono" [(ngModel)]="routePath" name="routePath" placeholder="/committee" />
+                </div>
+                <div class="form-group">
+                  <label>ক্রম (Sort Order)</label>
+                  <input class="form-control" type="number" [(ngModel)]="sortOrder" name="sortOrder" />
+                </div>
+              </div>
+              <div class="row2">
+                <div class="form-group">
+                  <label>আইকন (ঐচ্ছিক)</label>
+                  <input class="form-control" [(ngModel)]="icon" name="icon" placeholder="bar-chart" />
+                </div>
+                <div class="form-group">
+                  <label>লাগবে যে Permission</label>
+                  <input class="form-control mono" [(ngModel)]="requiredPermissionCode" name="requiredPermissionCode" placeholder="যেমন: committee.view" />
+                </div>
+              </div>
+
+              <label class="check"><input type="checkbox" [(ngModel)]="isActive" name="isActive" /> মেনুটি চালু রাখুন</label>
+
+              <div class="preview">
+                প্রিভিউ: <strong>{{ labelBn || 'নাম লিখুন' }}</strong>
+                @if (creationType === 'SUBMENU') { <span>— নির্বাচিত মেনুর ভেতরে দেখা যাবে</span> }
+                @else { <span>— উপরের মেনু বারে দেখা যাবে</span> }
+              </div>
+
+              <div class="actions">
+                <button class="btn primary" [disabled]="saving()" (click)="create()">
+                  {{ saving() ? 'সংরক্ষণ হচ্ছে...' : creationType === 'MENU' ? 'মেনু তৈরি করুন' : 'সাবমেনু তৈরি করুন' }}
+                </button>
+                <button class="btn" type="button" (click)="resetForm()">ফর্ম পরিষ্কার</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- RIGHT : TREE -->
+          <section class="card tree-card">
+            <div class="card-head"><strong>বর্তমান মেনু কাঠামো</strong><button class="btn sm" type="button" [disabled]="loading()" (click)="loadMenus()">রিফ্রেশ</button></div>
+            <div class="card-body">
+              @if (loading()) {
+                <p class="muted">মেনু লোড হচ্ছে...</p>
+              } @else {
+                <ul class="tree">
+                  @for (menu of rootMenus(); track menu.id) {
+                    <li class="tree-root">
+                      <div class="tree-row"><span class="dot"></span><strong>{{ menu.labelBn }}</strong><span class="badge" [class.off]="!menu.isActive">{{ menu.isActive ? 'চালু' : 'বন্ধ' }}</span></div>
+                      <div class="tree-meta">{{ menu.routePath || 'কোনো পেজ নেই — শুধু গ্রুপ' }} @if (menu.requiredPermissionCode) { · লাগবে: {{ menu.requiredPermissionCode }} }</div>
+                      @if (menu.children?.length) {
+                        <ul class="tree-sub">
+                          @for (child of menu.children; track child.id) {
+                            <li>
+                              <div class="tree-row sub"><span class="branch">└</span>{{ child.labelBn }}<span class="badge" [class.off]="!child.isActive">{{ child.isActive ? 'চালু' : 'বন্ধ' }}</span></div>
+                              <div class="tree-meta sub-meta">{{ child.routePath || '—' }}</div>
+                            </li>
+                          }
+                        </ul>
+                      }
+                    </li>
+                  } @empty {
+                    <li class="muted">কোনো মেনু পাওয়া যায়নি। বাম থেকে প্রথম মেনু তৈরি করুন।</li>
+                  }
+                </ul>
+              }
+              <div class="note">টিপস: একই নাম বারবার দেখলে বুঝবেন — উপরেরটা মূল মেনু, নিচেরগুলো তার ভেতরের সাবমেনু।</div>
+            </div>
+          </section>
         </div>
       }
     </div>
   `,
   styles: [`
-    .form-group { margin-bottom: 14px; }
-    .form-group label {
-      display: block;
-      margin-bottom: 6px;
-      font-weight: 600;
-    }
-    .form-control {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 9px 10px;
-    }
-    .menu-tree, .menu-tree ul {
-      padding-left: 24px;
-    }
-    .menu-tree li { margin: 8px 0; }
-    .menu-tree code {
-      margin-left: 8px;
-      font-size: 0.8rem;
-    }
+    .page { max-width: 1240px; margin: 0 auto; padding: 0 4px 40px; }
+    .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+    .page-head h1 { margin: 0; font-size: 1.45rem; color: #0a5c36; }
+    .sub { color: #5d6b63; margin: 6px 0 0; }
+    .stat { background: #fff; border: 1px solid #e8eee9; border-radius: 10px; padding: 10px 16px; display: flex; gap: 8px; align-items: baseline; }
+    .stat strong { font-size: 1.3rem; color: #0a5c36; }
+    .stat span { color: #5d6b63; font-size: .85rem; }
+    .layout { display: grid; grid-template-columns: 1fr 420px; gap: 16px; align-items: start; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    .card { background: #fff; border: 1px solid #e8eee9; border-radius: 12px; overflow: hidden; }
+    .card-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid #e8eee9; flex-wrap: wrap; gap: 8px; }
+    .card-body { padding: 18px; }
+    .step { font-size: .8rem; color: #5d6b63; }
+    .lbl { display: block; font-weight: 700; margin: 18px 0 8px; color: #0a5c36; font-size: .92rem; }
+    .lbl:first-child { margin-top: 0; }
+    .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .seg button { border: 1px solid #d5ddd8; background: #fff; border-radius: 10px; padding: 12px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 2px; font-size: .95rem; }
+    .seg button small { color: #5d6b63; font-weight: 400; }
+    .seg button.on { border-color: #0a5c36; background: #eaf5ee; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: .9rem; }
+    .form-control { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #d5ddd8; border-radius: 8px; }
+    .mono { font-family: monospace; }
+    .hint { color: #6b7a71; font-size: .8rem; display: block; margin-top: 4px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .check { display: flex; gap: 8px; align-items: center; margin: 12px 0; cursor: pointer; font-weight: 600; }
+    .preview { background: #f4f8f5; border-radius: 8px; padding: 10px 14px; font-size: .9rem; margin: 10px 0; }
+    .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .btn { padding: 10px 16px; border: 1px solid #d5ddd8; background: #f6f8f7; border-radius: 8px; cursor: pointer; }
+    .btn.primary { background: #0a5c36; border-color: #0a5c36; color: #fff; }
+    .btn.sm { padding: 6px 12px; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 12px; position: relative; }
+    .alert.error { background: #fdecea; color: #7f1d1d; }
+    .alert.success { background: #e6f4ea; color: #14532d; }
+    .x { position: absolute; right: 10px; top: 8px; background: none; border: none; font-size: 1.2rem; cursor: pointer; }
+    .tree { list-style: none; margin: 0; padding: 0; }
+    .tree-root { padding: 12px 0; border-bottom: 1px solid #f0f4f1; }
+    .tree-row { display: flex; gap: 8px; align-items: center; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #0a5c36; flex-shrink: 0; }
+    .branch { color: #9aa8a0; }
+    .badge { margin-left: auto; font-size: .75rem; background: #e3f1e8; color: #0a5c36; padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+    .badge.off { background: #f0f0f0; color: #5d6b63; }
+    .tree-meta { font-size: .82rem; color: #6b7a71; margin: 4px 0 0 16px; }
+    .tree-sub { list-style: none; padding-left: 16px; margin-top: 8px; }
+    .tree-row.sub { font-size: .92rem; }
+    .sub-meta { margin-left: 32px; }
+    .note { background: #fff8e6; border: 1px solid #f5e6b8; border-radius: 8px; padding: 10px 12px; font-size: .85rem; margin-top: 14px; }
+    .muted { color: #5d6b63; }
   `],
 })
 export class MenuManagementComponent implements OnInit {
