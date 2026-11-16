@@ -1,4 +1,4 @@
-// C-01 : কমিটির তালিকা - ধরন / কার্যপরিধি / সদস্য / সর্বশেষ পরিবর্তন FIX + Reject FIX
+// C-01 : কমিটির তালিকা - ধরন / কার্যপরিধি / সদস্য / সর্বশেষ পরিবর্তন FIX + Reject FIX + Tab Count FIX
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -38,6 +38,7 @@ type ApprovalInfo = { approved: number; total: number; isRejected: boolean; reje
     .badge-waiting { background: #f8fafc; color: #64748b; border-color: #e2e8f0; }
     .badge-rejected { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
     .member-count { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 8px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; font-weight: 600; color: #334155; }
+    
   `],
   template: `
     <div class="page-container">
@@ -159,15 +160,23 @@ export class CommitteeListComponent implements OnInit {
   pages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.size)));
   pageRows = computed(() => this.filtered().slice(this.page() * this.size, (this.page() + 1) * this.size));
 
-  // ★ Approval Reject হলে Committee-র আসল অবস্থা REJECTED
+  // ★ FIXED - Approval Reject / Complete হলে Committee-র আসল অবস্থা
+  // DRAFT -> খসড়া, REJECTED -> প্রত্যাখ্যাত, ACTIVE -> সক্রিয়, বাকি সব -> অনুমোদনাধীন
   effectiveStatus = (r: Row): string => {
+    if (String(r['status'] ?? '') === 'DRAFT') return 'DRAFT';
     const a = this.approvals().get(idOf(r));
     if (a?.isRejected) return 'REJECTED';
-    return String(r['status'] ?? '');
+    if (a && a.total > 0 && a.approved >= a.total) return 'ACTIVE';
+    // Approval এখনো লোড হয়নি - Committee এর পুরান status দিয়ে অনুমান
+    const raw = String(r['status'] ?? '').toUpperCase();
+    if (raw === 'ACTIVE') return 'ACTIVE';
+    if (raw === 'REJECTED') return 'REJECTED';
+    return 'IN_APPROVAL';
   };
 
+  // ★ FIXED - Tab Count + Filter এখন effectiveStatus দিয়ে, r['status'] দিয়ে না
   matches = (r: Row, v: string): boolean =>
-    !v || (v === 'IN_APPROVAL' ? ['SUBMITTED', 'UNDER_APPROVAL'].includes(r['status']) : r['status'] === v);
+    !v || this.effectiveStatus(r) === v;
   count = (v: string) => this.all().filter(r => this.matches(r, v)).length;
 
   // ★ Detail থেকে আসা ডাটা সহ সব জায়গা থেকে খুঁজবে

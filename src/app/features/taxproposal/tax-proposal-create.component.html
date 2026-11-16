@@ -1,0 +1,19 @@
+<div class="page">
+  <div class="page-head"><div><h2>নতুন কর আরোপের প্রস্তাব</h2><p class="muted">প্রথমে শুধু প্রস্তাবের হেডার তৈরি হবে — স্ট্যাটাস DRAFT। করের আইটেম / আয়-ব্যয় পরের ধাপে (Backend TODO আছে)।</p></div><a routerLink="/tax-proposals">← তালিকায় ফিরুন</a></div>
+  <form class="card" [formGroup]="form" (ngSubmit)="submit()">
+    <div class="grid">
+      <label>প্রস্তাব নং *<input formControlName="proposalNo" placeholder="যেমন: PROP-2026-001" /></label>
+      <label>উৎস *<select formControlName="sourceType"><option value="COMMITTEE_PROPOSAL">পেজ ২ — কমিটির প্রস্তাব</option><option value="GOVT_DIRECTIVE">পেজ ২-ক — সরকারি নির্দেশ (ধারা ১০১)</option></select></label>
+      <label *ngIf="isGovtDirective" class="highlight">নির্দেশ নং / Directive ID *<input formControlName="directiveId" placeholder="govt_directive এর ID" /><small>সরকারি নির্দেশ হলে বাধ্যতামূলক — ব্যাকএন্ডেও চেক আছে</small></label>
+      <label>প্রস্তাবের ধরন (PROPOSAL_KIND)<input formControlName="proposalKindId" placeholder="Config থেকে আসবে" /></label>
+      <label>শিরোনাম (বাংলা) *<input formControlName="titleBn" /></label>
+      <label>শিরোনাম (English)<input formControlName="titleEn" /></label>
+      <label>কমিটি ID<input formControlName="preparedByCommitteeId" placeholder="Committee Service থেকে" /></label>
+      <label>প্রস্তাবিত কার্যকর তারিখ<input type="date" formControlName="proposedEffectiveDate" /></label>
+      <label class="full">উদ্দেশ্য<textarea rows="3" formControlName="purposeNote"></textarea></label>
+    </div>
+    <div *ngIf="error()" class="alert">{{ error() }}</div>
+    <div class="footer"><button class="btn-primary" type="submit" [disabled]="saving()">{{ saving() ? 'সেভ হচ্ছে...' : 'খসড়া হিসেবে সেভ করুন' }}</button><span class="note">সেভ হলে স্ট্যাটাস হবে: DRAFT</span></div>
+  </form>
+  <div class="info" *ngIf="isGovtDirective">⚠️ পেজ ২-ক মনে রাখবেন: কমিটির সিদ্ধান্তই চূড়ান্ত। সিদ্ধান্ত এন্ট্রি হলেই প্রস্তাব স্বয়ংক্রিয়ভাবে FINALIZED হবে — সরকারি অনুমোদন লাগবে না। এই auto-finalize লজিকটা ব্যাকএন্ডে এখনো নেই।</div>
+</div>

@@ -103,6 +103,13 @@ export const routes: Routes = [
       { path: 'config/types', loadComponent: () => import('./features/config/type-list.component').then(m => m.TypeListComponent) },
       { path: 'config/types/:typeId/versions/:versionId', loadComponent: () => import('./features/config/type-editor.component').then(m => m.TypeEditorComponent) },
       { path: 'config/designations', loadComponent: () => import('./features/config/designation-list.component').then(m => m.DesignationListComponent) },
+      { path: 'config/designations', loadComponent: () => import('./features/config/designation-list.component').then(m => m.DesignationListComponent) },
+{
+  path: 'config/designation-assignments',
+  loadComponent: () =>
+    import('./features/designation/designation-assignment.component')
+      .then(m => m.DesignationAssignmentComponent),
+},
       { path: 'config/scopes', loadComponent: () => import('./features/config/scope-tree.component').then(m => m.ScopeTreeComponent) },
       { path: 'config/routes', loadComponent: () => import('./features/config/route-list.component').then(m => m.RouteListComponent) },
       { path: 'config/routes/:id', loadComponent: () => import('./features/config/route-editor.component').then(m => m.RouteEditorComponent) },
@@ -125,6 +132,7 @@ export const routes: Routes = [
       { path: 'notices/print-jobs/new', loadComponent: () => import('./features/municipal/notice-print-job.component').then(m => m.NoticePrintJobComponent) },
 
       { path: 'audit', loadComponent: () => import('./features/audit/audit-list.component').then(m => m.AuditListComponent) },
+      { path: 'taxproposal', loadChildren: () => import('./features/taxproposal/tax-proposal.routes').then(m => m.TAX_PROPOSAL_ROUTES) }
     ],
   },
   { path: '**', redirectTo: 'login' },

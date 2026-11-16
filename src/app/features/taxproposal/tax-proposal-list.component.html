@@ -1,0 +1,56 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h2>কর আরোপের প্রস্তাব</h2>
+      <p class="muted">কমিটি গঠনের পরের কাজ — পেজ ২ ও পেজ ২-ক। মোট {{ filtered().length }}টি প্রস্তাব।</p>
+    </div>
+    <a class="btn-primary" routerLink="/taxproposal/create">+ নতুন প্রস্তাব</a>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <input class="search" placeholder="প্রস্তাব নং / শিরোনাম দিয়ে খুঁজুন" [value]="search()" (input)="search.set($any($event.target).value)" />
+      <span class="hint">স্ট্যাটাস অনুযায়ী বাটন চালু / বন্ধ হবে</span>
+    </div>
+
+    <div *ngIf="loading()" class="empty">লোড হচ্ছে...</div>
+    <div *ngIf="!loading() && error()" class="alert">{{ error() }}</div>
+
+    <table *ngIf="!loading() && !error() && filtered().length">
+      <thead>
+        <tr>
+          <th>প্রস্তাব নং</th>
+          <th>শিরোনাম</th>
+          <th>ধরন</th>
+          <th>স্ট্যাটাস</th>
+          <th>প্রাক-প্রকাশ</th>
+          <th>আপত্তির শেষ তারিখ</th>
+          <th>অ্যাকশন</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of filtered()">
+          <td><strong>{{ p.proposalNo }}</strong></td>
+          <td>{{ p.titleBn }}<div class="sub">{{ p.titleEn }}</div></td>
+          <td>
+            <span class="badge" [class.govt]="p.sourceType === 'GOVT_DIRECTIVE'">
+              {{ p.sourceType === 'GOVT_DIRECTIVE' ? 'পেজ ২-ক · সরকারি নির্দেশ' : 'পেজ ২ · কমিটির প্রস্তাব' }}
+            </span>
+          </td>
+          <td><span class="status" [attr.data-status]="p.status">{{ statusBn[p.status] || p.status }}</span></td>
+          <td>{{ p.prePublishedOn || '—' }}</td>
+          <td>{{ p.objectionDeadline || '—' }}</td>
+          <td class="actions">
+            <a [routerLink]="['/taxproposal', p.id]">বিস্তারিত</a>
+            <button type="button" class="link" [disabled]="!canPrePublish(p)" (click)="prePublish(p)" title="শুধু DRAFT থেকে">প্রাক-প্রকাশ</button>
+            <button type="button" class="link" [disabled]="!canFinalize(p)" (click)="finalize(p)" title="PRE_PUBLISHED / UNDER_OBJECTION_REVIEW থেকে">চূড়ান্ত</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div *ngIf="!loading() && !filtered().length && !error()" class="empty">
+      কোনো প্রস্তাব পাওয়া যায়নি। <a routerLink="/taxproposal/create">নতুন প্রস্তাব তৈরি করুন</a>
+    </div>
+  </div>
+</div>

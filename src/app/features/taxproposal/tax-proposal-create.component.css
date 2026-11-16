@@ -1,0 +1,15 @@
+.page{padding:20px 24px;background:#f4f6f4;min-height:100vh;font-family:'Hind Siliguri',system-ui,sans-serif}
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px}
+.page-head h2{margin:0;font-size:24px}.muted{color:#6b7a70;font-size:13px}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.06);padding:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#33473a}
+label.full{grid-column:1/-1}
+input,select,textarea{padding:10px 12px;border:1px solid #dbe3dd;border-radius:8px;font-weight:400;font-size:14px}
+small{font-weight:400;color:#8a4b00}.highlight input{border-color:#f59e0b}
+.footer{display:flex;gap:12px;align-items:center;margin-top:18px}
+.btn-primary{background:#14532d;color:#fff;border:0;border-radius:8px;padding:11px 18px;cursor:pointer;font-weight:600}
+.btn-primary:disabled{opacity:.6}.note{color:#6b7a70;font-size:12px}
+.alert{margin-top:14px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:13px}
+.info{margin-top:14px;padding:12px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:13px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}

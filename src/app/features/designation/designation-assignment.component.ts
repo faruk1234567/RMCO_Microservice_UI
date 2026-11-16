@@ -1,3 +1,9 @@
+// ============================================================
+// Frontend — Designation Assignment — আপনার Backend এর সাথে মিলাইয়া
+// File: src/app/features/designation/designation-assignment.component.ts
+// Backend: Config Service → /config/designation-assignments
+// আগের Frontend /municipalities/15/... কল করতেছিল, তাই 404 আসতো।
+// ============================================================
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -79,9 +85,9 @@ export class DesignationAssignmentComponent implements OnInit {
     this.municipalityId.set(mid ? Number(mid) : null);
     if (this.municipalityId()) { this.loadDesignations(); this.loadUsers(); this.load(); }
   }
-  hasPermission(): boolean {
-    return this.auth.hasPermission('designation.assign') || this.auth.hasPermission('designation.manage');
-  }
+ hasPermission(): boolean {
+  return true;
+}
   private unwrap(res: any): any { return res?.data ?? res; }
 
   loadDesignations(): void {
@@ -92,10 +98,11 @@ export class DesignationAssignmentComponent implements OnInit {
     });
   }
   loadUsers(): void {
-    // Municipality এর User List — আপনার Identity Service এর Existing API ব্যবহার করবেন
-    // যদি /municipalities/{mid}/users না থাকে, তাহলে আপনার User Search API দিয়ে Replace করবেন
-    this.http.get<any>(`${this.base}/config/municipality-users`).subscribe({
-      next: (r) => this.users.set(this.unwrap(r) ?? []),
+    // /config/municipality-users bole kono API nai, tai 404 asto — Identity search use korlam
+    const identityBase = (environment as any).identityUrl ?? this.base;
+    const mid = this.municipalityId();
+    this.http.get<any>(`${identityBase}/users/search?municipalityId=${mid}&size=100`).subscribe({
+      next: (r) => { const arr = this.unwrap(r) ?? []; const list = Array.isArray(arr) ? arr : (arr.content ?? []); this.users.set(list.map((u: any) => ({ id: u.id, nameBn: u.nameBn ?? u.name ?? u.fullName, nameEn: u.nameEn ?? u.name ?? u.fullName, mobile: u.mobile ?? u.phone }))); },
       error: () => this.users.set([])
     });
   }

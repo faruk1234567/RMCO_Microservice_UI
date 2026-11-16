@@ -159,3 +159,81 @@ table.data-table tbody tr:hover { background: #f8fbf9; }
 .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
 .alert-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+/* ★ FIXED: Sudhu 1 ta scroll - Header sticky, Content normal */
+html, body {
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+app-root {
+  display: block;
+  min-height: 100vh;
+  overflow: visible;
+}
+
+/* ★ Uporer Header - ektai sticky thakbe */
+app-root header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* ★ Content - kono alada scroll na, page er sathei scroll hobe */
+app-root main,
+app-root .content,
+app-root .main-content,
+app-root .page-container {
+  overflow: visible;
+  min-height: 0;
+}
+/* ★ Responsive - sob page e */
+.page-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tabs-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+.tabs-row::-webkit-scrollbar { height: 4px; }
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.data-table {
+  min-width: 720px;
+  width: 100%;
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+  .page-container { padding: 12px; }
+  .page-header h1 { font-size: 20px; }
+  .data-table { min-width: 680px; }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .page-container { padding: 10px; }
+  .page-header { flex-direction: column; align-items: stretch; }
+  .page-header .btn, .page-header .btn-ghost { width: 100%; text-align: center; }
+  .data-table { min-width: 620px; font-size: 13px; }
+}
