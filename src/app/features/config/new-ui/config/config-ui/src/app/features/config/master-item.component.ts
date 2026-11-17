@@ -1,4 +1,4 @@
-// B-09 : ধারণ তালিকা (Master item) – কারণ, সদস্যের ধরন ইত্যাদি, group অনুযায়ী
+// B-09 : ধারণ তালিকা (Master item) – Dynamic Group, No Hardcode
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -24,7 +24,7 @@ import { CONFIG_STYLES, errMsg } from './config-shared';
       <div class="toolbar">
         <label>গ্রুপ:</label>
         <select class="form-control" style="max-width:260px" [ngModel]="group()" (ngModelChange)="setGroup($event)">
-          @for (g of groups; track g.v) { <option [value]="g.v">{{ g.l }}</option> }
+          @for (g of groups(); track g) { <option [value]="g">{{ g }}</option> }
           <option value="__custom">অন্য গ্রুপ (নিজে লিখব)...</option>
         </select>
         @if (group() === '__custom') {
@@ -67,25 +67,43 @@ import { CONFIG_STYLES, errMsg } from './config-shared';
 })
 export class MasterItemComponent implements OnInit {
   private svc = inject(ConfigAdminService);
-  // ⚠ group-এর কোডগুলো অনুমান; আপনার backend-এর সাথে মিলিয়ে নিন
-  groups = [
-    { v: 'GO_BACK_REASON', l: 'ফেরত পাঠানোর কারণ' },
-    { v: 'REJECT_REASON', l: 'প্রত্যাখ্যানের কারণ' },
-    { v: 'DISSOLVE_REASON', l: 'বিলুপ্তির কারণ' },
-    { v: 'MEMBER_TYPE', l: 'সদস্যের ধরন' },
-    { v: 'RESOLUTION_SUBJECT', l: 'প্রস্তাবের বিষয়' },
-  ];
-  group = signal('GO_BACK_REASON');
+
+  // ✅ আর কোনো Hardcode নাই — সব ডাটাবেজ থেকে আসবে
+  groups = signal<string[]>([]);
+  group = signal<string>('');
   customGroup = '';
   items = signal<MasterItem[]>([]);
   loading = signal(false); saving = signal(false); showForm = signal(false);
   err = signal(''); msg = signal('');
   code = ''; nameBn = ''; nameEn = '';
 
-  activeGroup = () => (this.group() === '__custom' ? this.customGroup.trim() : this.group());
+  activeGroup = () => (this.group() === '__custom' ? this.customGroup.trim().toUpperCase() : this.group());
 
-  ngOnInit() { this.load(); }
-  setGroup(g: string) { this.group.set(g); if (g !== '__custom') this.load(); else this.items.set([]); }
+  ngOnInit() { this.loadGroups(); }
+
+  loadGroups() {
+    this.svc.listMasterItemGroups().subscribe({
+    next: (list: any) => {
+        this.groups.set(list ?? []);
+        if (list?.length > 0 && !this.group()) {
+          this.group.set(list[0]);
+          this.load();
+        } else if (list?.length > 0 && !list.includes(this.group())) {
+          this.group.set(list[0]);
+          this.load();
+        } else {
+          this.load();
+        }
+      },
+      error: (e) => { this.err.set(errMsg(e)); },
+    });
+  }
+
+  setGroup(g: string) {
+    this.group.set(g);
+    if (g !== '__custom') this.load();
+    else this.items.set([]);
+  }
 
   load() {
     const g = this.activeGroup(); if (!g) return;
@@ -99,7 +117,13 @@ export class MasterItemComponent implements OnInit {
   create() {
     this.saving.set(true); this.err.set(''); this.msg.set('');
     this.svc.createMasterItem({ group: this.activeGroup(), code: this.code.trim(), nameBn: this.nameBn.trim(), nameEn: this.nameEn.trim() }).subscribe({
-      next: () => { this.saving.set(false); this.msg.set('আইটেম যোগ হয়েছে।'); this.code = this.nameBn = this.nameEn = ''; this.showForm.set(false); this.load(); },
+      next: () => {
+        this.saving.set(false);
+        this.msg.set('আইটেম যোগ হয়েছে।');
+        this.code = this.nameBn = this.nameEn = '';
+        this.showForm.set(false);
+        this.loadGroups(); // নতুন গ্রুপ হলে ড্রপডাউনে চলে আসবে
+      },
       error: (e) => { this.saving.set(false); this.err.set(errMsg(e)); },
     });
   }

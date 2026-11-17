@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TaxproposalService } from './tax-proposal.service';
+import { CommitteeService } from '../../core/services/committee.service';
 
 @Component({
   selector: 'app-taxproposal-create',
@@ -26,6 +27,7 @@ export class TaxproposalCreateComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private service: TaxproposalService,
+    private committeeService: CommitteeService,
     private router: Router
   ) {
     this.form = this.fb.group({
@@ -49,28 +51,47 @@ export class TaxproposalCreateComponent implements OnInit {
   }
 
   ngOnInit() {
+    // প্রস্তাবের ধরন
     (this.service as any).getProposalKinds?.().subscribe({
-      next: (res: any) => this.proposalKinds.set(res || []),
+      next: (res: any) => this.proposalKinds.set(this.toList(res)),
       error: () => this.proposalKinds.set([])
     });
-    (this.service as any).getCommittees?.().subscribe({
-      next: (res: any) => this.committees.set(res || []),
+
+    // ✅ কমিটি - CommitteeService থেকে শুধু ACTIVE কমিটি আসবে
+    this.committeeService.getActiveCommittees().subscribe({
+      next: (res: any) => {
+        const list = this.toList(res);
+        this.committees.set(list);
+        // যদি ১টাই সক্রিয় কমিটি থাকে, অটো সিলেক্ট হয়ে যাবে
+        if (list.length === 1) {
+          this.form.patchValue({ preparedByCommitteeId: list[0].id });
+        }
+      },
       error: () => this.committees.set([])
     });
+
+    // করের ধরন
     (this.service as any).getTaxTypes?.().subscribe({
-      next: (res: any) => this.taxTypes.set(res || []),
+      next: (res: any) => this.taxTypes.set(this.toList(res)),
       error: () => this.taxTypes.set([])
     });
   }
 
+  // Backend [] দিক বা {data: []} দিক - দুইটাই চলবে
+  private toList(res: any): any[] {
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.content)) return res.content;
+    if (Array.isArray(res?.items)) return res.items;
+    return [];
+  }
+
   // ---- করের হার - FormArray ----
-  // আগের নাম items ছিল, এখন itemsArray করলাম - লিস্টের সাথে ধাক্কা খাবে না
 
   get itemsArray(): FormArray {
     return this.form.get('items') as FormArray;
   }
 
-  // HTML এ items.controls লিখলে এরর আসতো, তাই এইটা দিলাম
   get itemsControls(): FormGroup[] {
     return this.itemsArray.controls as FormGroup[];
   }
@@ -177,7 +198,7 @@ export class TaxproposalCreateComponent implements OnInit {
     this.service.create(payload).subscribe({
       next: () => {
         this.saving.set(false);
-        this.router.navigate(['/taxproposal']);
+       this.router.navigate(['/tax-proposals']);
       },
       error: (err) => {
         this.saving.set(false);

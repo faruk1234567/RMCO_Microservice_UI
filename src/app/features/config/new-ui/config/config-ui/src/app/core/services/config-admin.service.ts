@@ -2,11 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, OperatorFunction, map } from 'rxjs';
 // ⚠ আপনার প্রজেক্টে environment-এর পথ/নাম আলাদা হলে শুধু এই দুই লাইন ঠিক করুন
-import { environment } from '../../../environments/environment';
+
 import {
   ApprovalRoute, CommitteeTypeRow, ConfigChangeLog, MasterItem, NotificationTemplate,
   ScopeNode, TypeVersion, UiLabel, UploadPolicy,
 } from '../models/config-admin.model';
+import { environment } from '../../../../../../../../../../environments/environment.prod';
 
 /** ApiResponse { success, data } হলে data খুলে দেয়; interceptor আগেই খুলে দিলে যেমন আছে তেমন রাখে */
 function unwrap<T>(): OperatorFunction<any, T> {
@@ -71,6 +72,9 @@ export class ConfigAdminService {
   listMasterItems(group: string): Observable<MasterItem[]> {
     return this.http.get(this.url('/config/master-items'), { params: new HttpParams().set('group', group) }).pipe(unwrap());
   }
+ listMasterItemGroups() {
+  return this.http.get(this.url('/config/master-items/groups')).pipe(unwrap());
+}
   createMasterItem(body: { group: string; code: string; nameBn: string; nameEn?: string }): Observable<Record<string, any>> {
     return this.http.post(this.url('/config/master-items'), body).pipe(unwrap());
   }

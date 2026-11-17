@@ -1,32 +1,56 @@
-// সক্রিয় কমিটির তালিকা থেকে বাছাই (তালিকা না এলে UUID হাতে লেখার ঘর)
-import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { catchError, of } from 'rxjs';
-import { EngineApiService } from '../../core/services/engine-api.service';
-import { Row, committeeName, idOf } from '../committee/engine-shared';
+import { CommitteeService } from '../../core/services/committee.service';
 
 @Component({
   selector: 'app-committee-select',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    @if (list().length) {
-      <select class="form-control" [ngModel]="value" (ngModelChange)="set($event)">
-        <option value="">— কমিটি বাছাই করুন —</option>
-        @for (c of list(); track id(c)) { <option [value]="id(c)">{{ name(c) }}</option> }
-      </select>
-    } @else {
-      <input class="form-control" [ngModel]="value" (ngModelChange)="set($event)" placeholder="কমিটির ID (UUID)" />
+    <select class="form-control" [ngModel]="value" (ngModelChange)="onChange($event)">
+      <option value="">
+        {{ loading ? 'কমিটি লোড হচ্ছে...' : '-- কমিটি বেছে নিন --' }}
+      </option>
+      @for (c of committees; track c.id) {
+        <option [value]="c.id">{{ c.nameBn || c.name || c.committeeName }}</option>
+      }
+    </select>
+    @if (!loading && committees.length === 0) {
+      <small style="color:red">কোনো সক্রিয় কমিটি পাওয়া যায়নি। প্রথমে কমিটি সক্রিয় করুন।</small>
     }
-  `,
+  `
 })
 export class CommitteeSelectComponent implements OnInit {
-  private api = inject(EngineApiService);
-  @Input() value = '';
+  @Input() value: string = '';
   @Output() valueChange = new EventEmitter<string>();
-  list = signal<Row[]>([]);
-  id = idOf; name = committeeName;
-  ngOnInit() { this.api.listCommittees('ACTIVE').pipe(catchError(() => of([] as Row[]))).subscribe(l => this.list.set(l ?? [])); }
-  set(v: string) { this.value = v; this.valueChange.emit(v); }
+
+  committees: any[] = [];
+  loading = false;
+
+  constructor(private committeeService: CommitteeService) {}
+
+  ngOnInit() {
+    this.loading = true;
+    // শুধু ACTIVE কমিটি আনবে - IN_APPROVAL / প্রত্যাখ্যাত আসবে না
+    this.committeeService.getActiveCommittees().subscribe({
+      next: (list: any) => {
+        this.committees = Array.isArray(list) ? list : (list?.data || list?.content || []);
+        this.loading = false;
+        // ১টাই সক্রিয় কমিটি থাকলে অটো সিলেক্ট
+        if (this.committees.length === 1 && !this.value) {
+          this.onChange(this.committees[0].id);
+        }
+      },
+      error: () => {
+        this.committees = [];
+        this.loading = false;
+      }
+    });
+  }
+
+  onChange(v: string) {
+    this.value = v;
+    this.valueChange.emit(v);
+  }
 }

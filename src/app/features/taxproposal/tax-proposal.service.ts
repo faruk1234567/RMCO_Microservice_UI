@@ -2,6 +2,22 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+export interface TaxProposalItemRequest {
+  taxTypeId?: string | null;
+  rateBasis: string;
+  proposedRate?: number | null;
+  proposedAnnualCollection?: number | null;
+  existingRate?: number | null;
+  existingAnnualCollection?: number | null;
+  rateNote?: string | null;
+}
+
+export interface FinanceHistoryRequest {
+  fiscalYear: string;
+  incomeAmount?: number | null;
+  expenseAmount?: number | null;
+}
+
 export interface CreateTaxProposalRequest {
   proposalNo: string;
   sourceType: string; // COMMITTEE_PROPOSAL | GOVT_DIRECTIVE
@@ -17,11 +33,14 @@ export interface CreateTaxProposalRequest {
   extraCollectionCost?: number;
   exceptionalNote?: string;
   proposedEffectiveDate?: string | null;
+  items?: TaxProposalItemRequest[];
+  financeHistory?: FinanceHistoryRequest[];
 }
 
 @Injectable({ providedIn: 'root' })
 export class TaxproposalService {
-  private base = '/taxproposal-service/tax-proposals';
+  private base = '/tax-proposal-service/api/v1/tax-proposals';
+  private configBase = '/config-service/api/v1/config/master-items';
 
   constructor(private http: HttpClient) {}
 
@@ -32,22 +51,20 @@ export class TaxproposalService {
   get(id: string): Observable<any> {
     return this.http.get<any>(`${this.base}/${id}`);
   }
-    // Committee gothon er list — Committee Service theke
+
+  // কমিটি — Committee Service থেকে
   getCommittees(): Observable<any> {
     return this.http.get<any>('/committee-service/committees');
   }
 
-  // Proposal Kind — Config Service theke
-  // Tomar Config e PROPOSAL_KIND lookup ta jevabe ache, oivabe
+  // প্রস্তাবের ধরন — Config Service থেকে, মাস্টার আইটেম
   getProposalKinds(): Observable<any> {
-    return this.http.get<any>('/config-service/lookups?group=PROPOSAL_KIND');
+    return this.http.get<any>(`${this.configBase}?group=PROPOSAL_KIND`);
   }
-  
 
-
-  // করের ধরন - কনফিগ থেকে
-  getTaxTypes(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.base}/config/lookups?group=TAX_TYPE`);
+  // করের ধরন — Config Service থেকে, মাস্টার আইটেম — একই জায়গা থেকে
+  getTaxTypes(): Observable<any> {
+    return this.http.get<any>(`${this.configBase}?group=TAX_TYPE`);
   }
 
   create(payload: CreateTaxProposalRequest): Observable<any> {

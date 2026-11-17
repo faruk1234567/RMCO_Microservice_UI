@@ -18,6 +18,7 @@ function unwrap<T>(): OperatorFunction<any, T> {
 
 @Injectable({ providedIn: 'root' })
 export class ConfigAdminService {
+  [x: string]: any;
   listScopeLevels(): Observable<ScopeLevel[]> {
   return this.http
     .get<any>(this.url('/config/scopes/levels'))
@@ -113,6 +114,9 @@ updateVersion(
   listMasterItems(group: string): Observable<MasterItem[]> {
     return this.http.get(this.url('/config/master-items'), { params: new HttpParams().set('group', group) }).pipe(unwrap());
   }
+listMasterItemGroups() {
+  return this.http.get(this.url('/config/master-items/groups')).pipe(unwrap());
+}
   createMasterItem(body: { group: string; code: string; nameBn: string; nameEn?: string }): Observable<Record<string, any>> {
     return this.http.post(this.url('/config/master-items'), body).pipe(unwrap());
   }

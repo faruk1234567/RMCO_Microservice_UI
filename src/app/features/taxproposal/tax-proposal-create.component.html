@@ -1,19 +1,118 @@
 <div class="page">
-  <div class="page-head"><div><h2>নতুন কর আরোপের প্রস্তাব</h2><p class="muted">প্রথমে শুধু প্রস্তাবের হেডার তৈরি হবে — স্ট্যাটাস DRAFT। করের আইটেম / আয়-ব্যয় পরের ধাপে (Backend TODO আছে)।</p></div><a routerLink="/tax-proposals">← তালিকায় ফিরুন</a></div>
+  <div class="page-head">
+    <div>
+      <h2>নতুন কর আরোপের প্রস্তাব</h2>
+      <p class="muted">হেডার + করের হার + আর্থিক ইতিহাস — একসাথে সেভ হবে। স্ট্যাটাস হবে DRAFT।</p>
+    </div>
+    <a routerLink="/tax-proposals">← তালিকায় ফিরুন</a>
+  </div>
+
   <form class="card" [formGroup]="form" (ngSubmit)="submit()">
+
+    <!-- ১. মূল তথ্য -->
+    <h3 class="section-title">১. মূল তথ্য</h3>
     <div class="grid">
       <label>প্রস্তাব নং *<input formControlName="proposalNo" placeholder="যেমন: PROP-2026-001" /></label>
       <label>উৎস *<select formControlName="sourceType"><option value="COMMITTEE_PROPOSAL">পেজ ২ — কমিটির প্রস্তাব</option><option value="GOVT_DIRECTIVE">পেজ ২-ক — সরকারি নির্দেশ (ধারা ১০১)</option></select></label>
-      <label *ngIf="isGovtDirective" class="highlight">নির্দেশ নং / Directive ID *<input formControlName="directiveId" placeholder="govt_directive এর ID" /><small>সরকারি নির্দেশ হলে বাধ্যতামূলক — ব্যাকএন্ডেও চেক আছে</small></label>
-      <label>প্রস্তাবের ধরন (PROPOSAL_KIND)<input formControlName="proposalKindId" placeholder="Config থেকে আসবে" /></label>
+
+      <label *ngIf="isGovtDirective()" class="highlight">নির্দেশ নং / Directive ID *<input formControlName="directiveId" placeholder="govt_directive এর ID" /><small>সরকারি নির্দেশ হলে বাধ্যতামূলক — ব্যাকএন্ডেও চেক আছে</small></label>
+
+      <label>প্রস্তাবের ধরন (PROPOSAL_KIND)
+        <select formControlName="proposalKindId">
+          <option value="">-- বেছে নিন --</option>
+          <option *ngFor="let k of proposalKinds()" [value]="k.id || k.code">{{ k.nameBn || k.name || k.label }}</option>
+        </select>
+      </label>
+
       <label>শিরোনাম (বাংলা) *<input formControlName="titleBn" /></label>
       <label>শিরোনাম (English)<input formControlName="titleEn" /></label>
-      <label>কমিটি ID<input formControlName="preparedByCommitteeId" placeholder="Committee Service থেকে" /></label>
+
+      <label>উদ্দেশ্যের ধরন *
+        <select formControlName="purposeType">
+          <option value="NEW_TAX">নতুন কর (NEW_TAX)</option>
+          <option value="RATE_REVISION">হার সংশোধন (RATE_REVISION)</option>
+          <option value="NEW_RATE">নতুন হার (NEW_RATE)</option>
+          <option value="EXTENSION">মেয়াদ বৃদ্ধি (EXTENSION)</option>
+        </select>
+      </label>
+
+      <label>প্রস্তুতকারী কমিটি
+        <select formControlName="preparedByCommitteeId">
+          <option value="">-- বেছে নিন --</option>
+          <option *ngFor="let c of committees()" [value]="c.id">{{ c.nameBn || c.name || c.committeeName }}</option>
+        </select>
+        <small *ngIf="committees().length === 0">কোনো সক্রিয় কমিটি পাওয়া যায়নি। প্রথমে কমিটি সক্রিয় করুন।</small>
+      </label>
+
       <label>প্রস্তাবিত কার্যকর তারিখ<input type="date" formControlName="proposedEffectiveDate" /></label>
-      <label class="full">উদ্দেশ্য<textarea rows="3" formControlName="purposeNote"></textarea></label>
+      <label class="full">উদ্দেশ্যের বিবরণ<textarea rows="3" formControlName="purposeNote"></textarea></label>
     </div>
+
+    <!-- ২. কার্যকর ও আদায়ের ব্যবস্থা -->
+    <h3 class="section-title">২. কার্যকর ও আদায়ের ব্যবস্থা</h3>
+    <div class="grid">
+      <label class="full">কভারেজ নোট<textarea rows="2" formControlName="coverageNote" placeholder="কারা / কোন এলাকায় প্রযোজ্য"></textarea></label>
+      <label class="full">আদায়ের ব্যবস্থা<textarea rows="2" formControlName="collectionArrangement" placeholder="কীভাবে আদায় হবে"></textarea></label>
+      <label>অতিরিক্ত আদায় ব্যয় (টাকা)<input type="number" formControlName="extraCollectionCost" /></label>
+      <label class="full">ব্যতিক্রমী বিষয়<textarea rows="2" formControlName="exceptionalNote"></textarea></label>
+    </div>
+
+    <!-- ৩. করের হার -->
+    <h3 class="section-title">৩. করের হার</h3>
+    <div formArrayName="items">
+      <div *ngFor="let item of itemsControls; let i = index" [formGroupName]="i" class="item-box">
+        <div class="item-head">
+          <strong>হার {{ i + 1 }}</strong>
+          <button type="button" class="link danger" (click)="removeItem(i)" *ngIf="itemsArray.length > 1">মুছুন</button>
+        </div>
+        <div class="grid">
+          <label>করের ধরন *
+            <select formControlName="taxTypeId">
+              <option value="">-- বেছে নিন --</option>
+              <option *ngFor="let t of taxTypes()" [value]="t.id || t.code">{{ t.nameBn || t.name || t.label }}</option>
+            </select>
+          </label>
+          <label>হারের ভিত্তি *
+            <select formControlName="rateBasis">
+              <option value="PERCENT">শতকরা (PERCENT)</option>
+              <option value="FIXED">নির্দিষ্ট টাকা (FIXED)</option>
+              <option value="PER_UNIT">প্রতি ইউনিট (PER_UNIT)</option>
+            </select>
+          </label>
+          <label>প্রস্তাবিত হার *<input type="number" formControlName="proposedRate" placeholder="যেমন: 5" /></label>
+          <label>প্রস্তাবিত বার্ষিক আদায়<input type="number" formControlName="proposedAnnualCollection" placeholder="টাকা" /></label>
+          <label>বর্তমান হার<input type="number" formControlName="existingRate" placeholder="যেমন: 3" /></label>
+          <label>বর্তমান বার্ষিক আদায়<input type="number" formControlName="existingAnnualCollection" placeholder="টাকা" /></label>
+          <label class="full">হারের নোট<input formControlName="rateNote" placeholder="প্রয়োজনে লিখুন" /></label>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn-secondary" (click)="addItem()">+ আরেকটি হার যোগ করুন</button>
+
+    <!-- ৪. আর্থিক ইতিহাস -->
+    <h3 class="section-title">৪. আর্থিক ইতিহাস (বিগত বছর)</h3>
+    <div formArrayName="financeHistory">
+      <div *ngIf="financeControls.length === 0" class="empty">এখনো কোনো বছর যোগ হয়নি (ঐচ্ছিক)।</div>
+      <div *ngFor="let f of financeControls; let i = index" [formGroupName]="i" class="item-box">
+        <div class="item-head">
+          <strong>বছর {{ i + 1 }}</strong>
+          <button type="button" class="link danger" (click)="removeFinanceYear(i)">মুছুন</button>
+        </div>
+        <div class="grid">
+          <label>অর্থবছর *<input formControlName="fiscalYear" placeholder="যেমন: ২০২৪-২৫" /></label>
+          <label>আয় (টাকা) *<input type="number" formControlName="incomeAmount" /></label>
+          <label>ব্যয় (টাকা) *<input type="number" formControlName="expenseAmount" /></label>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn-secondary" (click)="addFinanceYear()">+ বছর যোগ করুন</button>
+
     <div *ngIf="error()" class="alert">{{ error() }}</div>
-    <div class="footer"><button class="btn-primary" type="submit" [disabled]="saving()">{{ saving() ? 'সেভ হচ্ছে...' : 'খসড়া হিসেবে সেভ করুন' }}</button><span class="note">সেভ হলে স্ট্যাটাস হবে: DRAFT</span></div>
+    <div class="footer">
+      <button class="btn-primary" type="submit" [disabled]="saving()">{{ saving() ? 'সেভ হচ্ছে...' : 'খসড়া হিসেবে সেভ করুন' }}</button>
+      <span class="note">সেভ হলে স্ট্যাটাস হবে: DRAFT</span>
+    </div>
   </form>
-  <div class="info" *ngIf="isGovtDirective">⚠️ পেজ ২-ক মনে রাখবেন: কমিটির সিদ্ধান্তই চূড়ান্ত। সিদ্ধান্ত এন্ট্রি হলেই প্রস্তাব স্বয়ংক্রিয়ভাবে FINALIZED হবে — সরকারি অনুমোদন লাগবে না। এই auto-finalize লজিকটা ব্যাকএন্ডে এখনো নেই।</div>
+
+  <div class="info" *ngIf="isGovtDirective()">⚠ পেজ ২-ক মনে রাখবেন: কমিটির সিদ্ধান্তই চূড়ান্ত। সিদ্ধান্ত এন্ট্রি হলেই প্রস্তাব স্বয়ংক্রিয়ভাবে FINALIZED হবে — সরকারি অনুমোদন লাগবে না। এই auto-finalize লজিকটা ব্যাকএন্ডে এখনো নেই।</div>
 </div>

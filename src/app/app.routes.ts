@@ -119,9 +119,11 @@ export const routes: Routes = [
       { path: 'config/change-log', loadComponent: () => import('./features/config/change-log.component').then(m => m.ChangeLogComponent) },
 
       // ---------- কর প্রস্তাব, আপত্তি, নোটিশ ----------
-      { path: 'tax-proposals', loadComponent: () => import('./features/municipal/tax-proposal-list.component').then(m => m.TaxProposalListComponent) },
-      { path: 'tax-proposals/new', loadComponent: () => import('./features/municipal/tax-proposal-form.component').then(m => m.TaxProposalFormComponent) },
-      { path: 'tax-proposals/:id', loadComponent: () => import('./features/municipal/tax-proposal-detail.component').then(m => m.TaxProposalDetailComponent) },
+      // ---------- কর প্রস্তাব, আপত্তি, নোটিশ ----------
+{ path: 'tax-proposals', loadComponent: () => import('./features/municipal/tax-proposal-list.component').then(m => m.TaxProposalListComponent) },
+{ path: 'tax-proposals/new', loadComponent: () => import('./features/municipal/tax-proposal-form.component').then(m => m.TaxProposalFormComponent) },
+{ path: 'tax-proposals/create', loadComponent: () => import('./features/taxproposal/tax-proposal-create.component').then(m => m.TaxproposalCreateComponent) },
+{ path: 'tax-proposals/:id', loadComponent: () => import('./features/municipal/tax-proposal-detail.component').then(m => m.TaxProposalDetailComponent) },
       { path: 'objections', loadComponent: () => import('./features/municipal/objection-list.component').then(m => m.ObjectionListComponent) },
       { path: 'objections/new', loadComponent: () => import('./features/municipal/objection-form.component').then(m => m.ObjectionFormComponent) },
       { path: 'objections/:id', loadComponent: () => import('./features/municipal/objection-detail.component').then(m => m.ObjectionDetailComponent) },

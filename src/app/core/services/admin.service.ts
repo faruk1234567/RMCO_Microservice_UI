@@ -1,7 +1,7 @@
 
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -312,6 +312,10 @@ getLookupChildren(parentId: number | string) {
   return this.http.get<any>(
     `${this.base}/lookups/children/${parentId}`
   );
+}
+listMasterItemGroups() {
+  return this.http.get<any>('/api/config-service/api/v1/config/master-items/groups')
+    .pipe(map((res: any) => res?.data ?? res ?? []));
 }
 
 
