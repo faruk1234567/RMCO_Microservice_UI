@@ -39,7 +39,7 @@ export interface CreateTaxProposalRequest {
 
 @Injectable({ providedIn: 'root' })
 export class TaxproposalService {
-  private base = '/tax-proposal-service/api/v1/tax-proposals';
+  private base = '/api/v1/tax-proposals';
   private configBase = '/config-service/api/v1/config/master-items';
 
   constructor(private http: HttpClient) {}
@@ -82,4 +82,16 @@ export class TaxproposalService {
   objectionWindow(id: string): Observable<any> {
     return this.http.get<any>(`${this.base}/${id}/objection-window`);
   }
+  getRateBases(): Observable<any> {
+  return this.http.get<any>(`${this.configBase}?group=RATE_BASIS`);
+}
+getPurposeTypes(): Observable<any> {
+  return this.http.get<any>(`${this.configBase}?group=PURPOSE_TYPE`);
+}
+getAssessmentOptions(): Observable<any> {
+  return this.http.get<any>(`${this.configBase}?group=ASSESSMENT_METHOD`);
+}
+listProposals() {
+  return this.http.get<any[]>(`/api/v1/tax-proposals`);
+}
 }

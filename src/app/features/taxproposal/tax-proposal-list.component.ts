@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TaxproposalService } from './tax-proposal.service';
 
 @Component({
@@ -16,6 +16,9 @@ export class TaxproposalListComponent implements OnInit {
   loading = signal(false);
   error = signal('');
   search = signal('');
+
+  // UUID দিয়ে খোঁজার জন্য আলাদা ইনপুট
+  searchId = signal('');
 
   // স্ট্যাটাসের বাংলা
   statusBn: Record<string, string> = {
@@ -33,13 +36,16 @@ export class TaxproposalListComponent implements OnInit {
     const list = this.proposals();
     if (!q) return list;
     return list.filter((p: any) =>
-      (p.proposalNo || '').toLowerCase().includes(q) ||
+      (p.proposalNo || '').toString().toLowerCase().includes(q) ||
       (p.titleBn || '').toLowerCase().includes(q) ||
       (p.titleEn || '').toLowerCase().includes(q)
     );
   });
 
-  constructor(private service: TaxproposalService) {}
+  constructor(
+    private service: TaxproposalService,
+    private router: Router
+  ) {}
 
   ngOnInit() {
     this.load();
@@ -51,7 +57,26 @@ export class TaxproposalListComponent implements OnInit {
     this.service.list().subscribe({
       next: (res: any) => {
         // ব্যাকএন্ড থেকে array আসলে array, না হলে res.data
-        const arr = Array.isArray(res) ? res : (res?.data || []);
+        let arr = Array.isArray(res) ? res : (res?.data || []);
+
+        // *** এই ফিল্টারটাই আসল ঠিক ***
+        // /create থেকে আসা ভুল ডাটা বাদ দাও
+        // আসল প্রস্তাবের id অবশ্যই UUID হবে, proposalNo থাকবে
+        arr = arr.filter((p: any) => {
+          if (!p) return false;
+          // 'create' নামে কোনো প্রস্তাব নাই - এইটা বাদ
+          if (p.proposalNo === 'create') return false;
+          if (p.id === 'create') return false;
+          // UUID না হলে বাদ - create... এইটা UUID না
+          if (!p.id || p.id.length < 30) return false;
+          return true;
+        });
+
+        // নতুনটা উপরে দেখাও
+        arr.sort((a: any, b: any) =>
+          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+
         this.proposals.set(arr);
         this.loading.set(false);
       },
@@ -60,6 +85,28 @@ export class TaxproposalListComponent implements OnInit {
         this.error.set(err?.error?.message || 'লিস্ট আনতে সমস্যা হয়েছে');
       }
     });
+  }
+
+  // সার্চ বক্সে টাইপ করলে
+  onSearch(event: any) {
+    this.search.set(event.target.value || '');
+  }
+
+  // UUID দিয়ে খুঁজুন বাটন
+  openById() {
+    const id = this.searchId().trim();
+    if (!id) return;
+    this.router.navigate(['/tax-proposals', id]);
+  }
+
+  onSearchId(event: any) {
+    this.searchId.set(event.target.value || '');
+  }
+
+  // ডিটেইলসে যাও
+  openProposal(p: any) {
+    if (!p?.id) return;
+    this.router.navigate(['/tax-proposals', p.id]);
   }
 
   // প্রাক-প্রকাশ বাটন কখন চালু থাকবে

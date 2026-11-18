@@ -34,9 +34,10 @@ export const routes: Routes = [
       { path: '', redirectTo: 'menus', pathMatch: 'full' },
       {
         path: 'menus',
-      loadComponent: () =>
-  import('./menu/menu-manager.component')
-    .then(m => m.MenuManagerComponent),},
+        loadComponent: () =>
+          import('./menu/menu-manager.component')
+            .then(m => m.MenuManagerComponent),
+      },
       {
         path: 'permissions',
         loadComponent: () =>
@@ -103,13 +104,12 @@ export const routes: Routes = [
       { path: 'config/types', loadComponent: () => import('./features/config/type-list.component').then(m => m.TypeListComponent) },
       { path: 'config/types/:typeId/versions/:versionId', loadComponent: () => import('./features/config/type-editor.component').then(m => m.TypeEditorComponent) },
       { path: 'config/designations', loadComponent: () => import('./features/config/designation-list.component').then(m => m.DesignationListComponent) },
-      { path: 'config/designations', loadComponent: () => import('./features/config/designation-list.component').then(m => m.DesignationListComponent) },
-{
-  path: 'config/designation-assignments',
-  loadComponent: () =>
-    import('./features/designation/designation-assignment.component')
-      .then(m => m.DesignationAssignmentComponent),
-},
+      {
+        path: 'config/designation-assignments',
+        loadComponent: () =>
+          import('./features/designation/designation-assignment.component')
+            .then(m => m.DesignationAssignmentComponent),
+      },
       { path: 'config/scopes', loadComponent: () => import('./features/config/scope-tree.component').then(m => m.ScopeTreeComponent) },
       { path: 'config/routes', loadComponent: () => import('./features/config/route-list.component').then(m => m.RouteListComponent) },
       { path: 'config/routes/:id', loadComponent: () => import('./features/config/route-editor.component').then(m => m.RouteEditorComponent) },
@@ -119,11 +119,12 @@ export const routes: Routes = [
       { path: 'config/change-log', loadComponent: () => import('./features/config/change-log.component').then(m => m.ChangeLogComponent) },
 
       // ---------- কর প্রস্তাব, আপত্তি, নোটিশ ----------
-      // ---------- কর প্রস্তাব, আপত্তি, নোটিশ ----------
-{ path: 'tax-proposals', loadComponent: () => import('./features/municipal/tax-proposal-list.component').then(m => m.TaxProposalListComponent) },
-{ path: 'tax-proposals/new', loadComponent: () => import('./features/municipal/tax-proposal-form.component').then(m => m.TaxProposalFormComponent) },
-{ path: 'tax-proposals/create', loadComponent: () => import('./features/taxproposal/tax-proposal-create.component').then(m => m.TaxproposalCreateComponent) },
-{ path: 'tax-proposals/:id', loadComponent: () => import('./features/municipal/tax-proposal-detail.component').then(m => m.TaxProposalDetailComponent) },
+      // *** ঠিক করা রাউট - ডাবল নাই, পুরনো /new নাই ***
+      // সিরিয়াল: list → create → :id (create আগে, :id পরে)
+      { path: 'tax-proposals', loadComponent: () => import('./features/taxproposal/tax-proposal-list.component').then(m => m.TaxproposalListComponent) },
+      { path: 'tax-proposals/create', loadComponent: () => import('./features/taxproposal/tax-proposal-create.component').then(m => m.TaxproposalCreateComponent) },
+      { path: 'tax-proposals/:id', loadComponent: () => import('./features/municipal/tax-proposal-detail.component').then(m => m.TaxProposalDetailComponent) },
+
       { path: 'objections', loadComponent: () => import('./features/municipal/objection-list.component').then(m => m.ObjectionListComponent) },
       { path: 'objections/new', loadComponent: () => import('./features/municipal/objection-form.component').then(m => m.ObjectionFormComponent) },
       { path: 'objections/:id', loadComponent: () => import('./features/municipal/objection-detail.component').then(m => m.ObjectionDetailComponent) },
@@ -134,7 +135,8 @@ export const routes: Routes = [
       { path: 'notices/print-jobs/new', loadComponent: () => import('./features/municipal/notice-print-job.component').then(m => m.NoticePrintJobComponent) },
 
       { path: 'audit', loadComponent: () => import('./features/audit/audit-list.component').then(m => m.AuditListComponent) },
-      { path: 'taxproposal', loadChildren: () => import('./features/taxproposal/tax-proposal.routes').then(m => m.TAX_PROPOSAL_ROUTES) }
+      // ❌ এই লাইনটা কেটে দিছি - এইটাই ডাবল রাউট বানাইতেছিলো
+      // { path: 'taxproposal', loadChildren: () => import('./features/taxproposal/tax-proposal.routes').then(m => m.TAX_PROPOSAL_ROUTES) }
     ],
   },
   { path: '**', redirectTo: 'login' },
