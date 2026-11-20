@@ -18,6 +18,18 @@ export interface FinanceHistoryRequest {
   expenseAmount?: number | null;
 }
 
+// *** ৩ নম্বর - এইটা না থাকলে টিক সেভ হবে না ***
+export interface AssessmentMethodRequest {
+  methodCode: string; // FULLY_RENTED | FULLY_OCCUPIED | PARTIAL
+  enabled?: boolean | null;
+  basisType?: string | null;
+  deductMaintenance?: boolean | null;
+  deductMortgageNonCommercial?: boolean | null;
+  deductMortgageCommercialOneThird?: boolean | null;
+  compareWithMarketRent?: boolean | null;
+  note?: string | null;
+}
+
 export interface CreateTaxProposalRequest {
   proposalNo: string;
   sourceType: string; // COMMITTEE_PROPOSAL | GOVT_DIRECTIVE
@@ -35,6 +47,8 @@ export interface CreateTaxProposalRequest {
   proposedEffectiveDate?: string | null;
   items?: TaxProposalItemRequest[];
   financeHistory?: FinanceHistoryRequest[];
+  // *** ৩ নম্বর - এই লাইনটা বাড়ানো হইলো ***
+  assessmentMethods?: AssessmentMethodRequest[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -50,6 +64,11 @@ export class TaxproposalService {
 
   get(id: string): Observable<any> {
     return this.http.get<any>(`${this.base}/${id}`);
+  }
+
+  // *** রিপোর্টের জন্য - get() এরই আরেক নাম, যাতে getById() কাজ করে ***
+  getById(id: string): Observable<any> {
+    return this.get(id);
   }
 
   // কমিটি — Committee Service থেকে
@@ -82,16 +101,17 @@ export class TaxproposalService {
   objectionWindow(id: string): Observable<any> {
     return this.http.get<any>(`${this.base}/${id}/objection-window`);
   }
+
   getRateBases(): Observable<any> {
-  return this.http.get<any>(`${this.configBase}?group=RATE_BASIS`);
-}
-getPurposeTypes(): Observable<any> {
-  return this.http.get<any>(`${this.configBase}?group=PURPOSE_TYPE`);
-}
-getAssessmentOptions(): Observable<any> {
-  return this.http.get<any>(`${this.configBase}?group=ASSESSMENT_METHOD`);
-}
-listProposals() {
-  return this.http.get<any[]>(`/api/v1/tax-proposals`);
-}
+    return this.http.get<any>(`${this.configBase}?group=RATE_BASIS`);
+  }
+  getPurposeTypes(): Observable<any> {
+    return this.http.get<any>(`${this.configBase}?group=PURPOSE_TYPE`);
+  }
+  getAssessmentOptions(): Observable<any> {
+    return this.http.get<any>(`${this.configBase}?group=ASSESSMENT_METHOD`);
+  }
+  listProposals() {
+    return this.http.get<any[]>(`/api/v1/tax-proposals`);
+  }
 }

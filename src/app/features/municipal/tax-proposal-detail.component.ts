@@ -18,9 +18,12 @@ import { MUNI_STYLES, RK, Recent, Row, bnStatus, endOfDay, entries, errMsg, fmtD
       <div class="page-header">
         <div><a routerLink="/tax-proposals" class="muted">← কর প্রস্তাব</a>
           <h1>{{ p()?.['titleBn'] || 'কর প্রস্তাব' }} @if (p()) { <span [class]="'st st-' + p()!['status']">{{ bn(p()!['status']) }}</span> }</h1></div>
-        @if (p() && p()!['prePublishedOn']) {
-          <a class="btn-ghost" style="text-decoration:none" routerLink="/objections/new" [queryParams]="{ proposalId: id }">এই প্রস্তাবে আপত্তি জমা দিন</a>
-        }
+        <div style="display:flex;gap:8px">
+          <a class="btn-ghost" style="text-decoration:none" [routerLink]="['/tax-proposals', id, 'report']">📄 প্রফেশনাল রিপোর্ট</a>
+          @if (p() && p()!['prePublishedOn']) {
+            <a class="btn-ghost" style="text-decoration:none" routerLink="/objections/new" [queryParams]="{ proposalId: id }">এই প্রস্তাবে আপত্তি জমা দিন</a>
+          }
+        </div>
       </div>
       @if (err()) { <div class="alert alert-err">{{ err() }}</div> }
       @if (msg()) { <div class="alert alert-ok">{{ msg() }}</div> }
@@ -75,7 +78,31 @@ export class TaxProposalDetailComponent implements OnInit {
   noticeDoc = signal('');
 
   bn = bnStatus; fmtD = (v: any) => fmtDate(v);
-  rows = computed(() => entries(this.p()).filter(e => e.k !== 'id'));
+
+  // *** এটাই আসল ফিক্স - ID ফিল্ডগুলা লুকিয়ে দেওয়া ***
+  rows = computed(() => {
+    const HIDE = new Set([
+      'id',
+      'municipalityId',        // ID - লুকানো
+      'preparedByCommitteeId', // ID - এর বদলে committeeName দেখাবো
+      'createdBy',             // ID - এর বদলে createdByName দেখাবো
+      'currentVersionId',      // ID
+      'directiveId',           // ID
+      'items', 'assessmentMethods' // এগুলা নিচের টেবিলে / রিপোর্টে দেখাবো, এখানে না
+    ]);
+    return entries(this.p())
+      .filter(e => !HIDE.has(e.k))
+      .map(e => {
+        // লেবেলগুলা সুন্দর বাংলা করে দেওয়া
+        if (e.k === 'committeeName') return { ...e, label: 'প্রস্তুতকারী কমিটি' };
+        if (e.k === 'createdByName') return { ...e, label: 'তৈরি করেছেন' };
+        if (e.k === 'purposeTypeLabel') return { ...e, label: 'উদ্দেশ্যের ধরন' };
+        if (e.k === 'sourceTypeLabel') return { ...e, label: 'উৎস' };
+        if (e.k === 'municipalityName') return { ...e, label: 'পৌরসভা' };
+        return e;
+      });
+  });
+
   deadline = computed<string>(() => this.win()?.['objectionDeadline'] ?? this.p()?.['objectionDeadline'] ?? '');
   isOpen = computed<boolean>(() => {
     const w = this.win()?.['isOpen'];

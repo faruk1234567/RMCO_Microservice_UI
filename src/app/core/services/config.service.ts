@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, catchError, map } from 'rxjs';
+//import { Observable, of, catchError, map } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
+import { Observable, of, catchError, map, forkJoin } from 'rxjs';
 import {
   Designation,
   ApprovalRoute,
@@ -98,32 +99,70 @@ export class ConfigService {
     );
   }
 
+
   // ---- Scope ----
+
   listScopeLevels(): Observable<ScopeLevel[]> {
-    return this.http.get<ScopeLevel[]>(`${this.base}/config/scope-levels`).pipe(
-      catchError(() =>
-        of([
-          { id: 'sl-1', municipalityId: 'm-001', code: 'MUNI', nameBn: 'পৌরসভা', sortOrder: 1 },
-          { id: 'sl-2', municipalityId: 'm-001', code: 'WARD', nameBn: 'ওয়ার্ড', sortOrder: 2 },
-        ])
-      )
+    return this.http.get<any>(
+      `${this.base}/config/scopes/levels`
+    ).pipe(
+      map(response => {
+        const data = response?.data ?? response;
+
+        return Array.isArray(data) ? data : [];
+      })
     );
   }
 
   getScopeTree(): Observable<ScopeNode[]> {
-    return this.http.get<ScopeNode[]>(`${this.base}/config/scope-nodes/tree`).pipe(
-      catchError(() =>
-        of([
-          {
-            id: 'sn-1', levelId: 'sl-1', code: 'JHE', nameBn: 'ঝিনাইদহ পৌরসভা', isActive: true,
-            children: [
-              { id: 'sn-2', levelId: 'sl-2', parentId: 'sn-1', code: 'W1', nameBn: 'ওয়ার্ড ১', isActive: true },
-              { id: 'sn-3', levelId: 'sl-2', parentId: 'sn-1', code: 'W2', nameBn: 'ওয়ার্ড ২', isActive: true },
-              { id: 'sn-4', levelId: 'sl-2', parentId: 'sn-1', code: 'W3', nameBn: 'ওয়ার্ড ৩', isActive: true },
-            ],
-          },
-        ])
-      )
+    return this.http.get<any>(
+      `${this.base}/config/scopes/tree`
+    ).pipe(
+      map(response => {
+        const data = response?.data ?? response;
+
+        return Array.isArray(data) ? data : [];
+      })
+    );
+  }
+
+  /**
+   * Scope Node-এর levelId দিয়ে Level-এর নাম ও ক্রম নম্বর যুক্ত করে।
+   */
+  getScopeTreeWithLevels(): Observable<ScopeNode[]> {
+    return forkJoin({
+      levels: this.listScopeLevels(),
+      nodes: this.getScopeTree()
+    }).pipe(
+      map(({ levels, nodes }) => {
+
+        const levelMap = new Map(
+          levels.map(level => [level.id, level])
+        );
+
+        const enrichNodes = (
+          items: ScopeNode[]
+        ): ScopeNode[] => {
+
+          return items.map(node => {
+
+            const level = levelMap.get(node.levelId);
+
+            return {
+              ...node,
+
+              levelNo: level?.levelNo ?? node.levelNo,
+
+              levelNameBn:
+                level?.nameBn ?? node.levelNameBn,
+
+              children: enrichNodes(node.children ?? [])
+            };
+          });
+        };
+
+        return enrichNodes(nodes);
+      })
     );
   }
 

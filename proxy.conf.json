@@ -1,10 +1,5 @@
 {
-  "/api/v1/tax-proposals": {
-    "target": "http://localhost:8091",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  },
+  
   "/api/v1/workflow": {
     "target": "http://localhost:8085",
     "secure": false,
@@ -41,16 +36,10 @@
     "changeOrigin": true,
     "logLevel": "debug"
   },
-  "/taxproposal-service": {
-    "target": "http://localhost:8080",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  },
-  "/tax-proposal-service": {
-    "target": "http://localhost:8080",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  }
+ "/api/v1/tax-proposals": {
+  "target": "http://localhost:8091",
+  "secure": false,
+  "changeOrigin": true,
+  "logLevel": "debug"
+}
 }

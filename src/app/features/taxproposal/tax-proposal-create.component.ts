@@ -194,18 +194,17 @@ if (v.sourceType === 'MUNICIPAL') {
         incomeAmount: cleanNum(f.incomeAmount),
         expenseAmount: cleanNum(f.expenseAmount)
       })),
-      assessmentMethods: (v.assessmentMethods || []).map((a: any) => ({
-        buildingCategory: a.buildingCategory,
-        enabled: !!a.enabled,
-        maintenanceDeduction: !!a.maintenanceDeduction,
-        mortgageFullDeduction: !!a.mortgageFullDeduction,
-        mortgageQuarterDeduction: !!a.mortgageQuarterDeduction,
-        comparableRent: !!a.comparableRent,
-        baseMethod: a.baseMethod,
-        maintenanceSixth: !!a.maintenanceSixth,
-        quarterAfterMaintenance: !!a.quarterAfterMaintenance,
-        note: clean(a.note?.trim())
-      }))
+
+assessmentMethods: (v.assessmentMethods || []).map((a: any) => ({
+  methodCode: a.buildingCategory,
+  enabled: !!a.enabled,
+  basisType: a.baseMethod,
+  deductMaintenance: !!a.maintenanceDeduction,
+  deductMortgageNonCommercial: !!a.mortgageFullDeduction,
+  deductMortgageCommercialOneThird: !!a.mortgageQuarterDeduction,
+  compareWithMarketRent: !!a.comparableRent,
+  note: clean(a.note?.trim())
+}))
     };
     this.service.create(payload).subscribe({
       next: () => { this.saving.set(false); this.router.navigate(['/tax-proposals']); },

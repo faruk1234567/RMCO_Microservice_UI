@@ -178,50 +178,47 @@ onDocClick(e: MouseEvent) {
   }
 
   isParentActive(item: MenuItem): boolean {
-    const currentUrl = this.router.url.split('?')[0].split('#')[0];
+  const currentUrl = this.router.url.split('?')[0].split('#')[0];
+  const myRoute = this.getMenuRoute(item);
 
-    if (item.routePath && currentUrl === item.routePath) {
-      return true;
-    }
-
-    return (item.children ?? []).some((child) =>
-      child.routePath === currentUrl
-    );
+  if (myRoute && currentUrl === myRoute) {
+    return true;
   }
+
+  return (item.children ?? []).some((child) => {
+    const childRoute = this.getMenuRoute(child);
+    return childRoute !== null && childRoute === currentUrl;
+  });
+}
 
   logout(): void {
     this.auth.logout();
   }
 getMenuRoute(item: MenuItem): string | null {
-  const isPlatformAdmin = this.auth.hasRole('PLATFORM_ADMIN');
+  // ✅ Dynamic: Route Backend / Menu থেকে আসবে, Code এ কোনো Route লেখা থাকবে না
+  // ADMIN_USERS / admin/roles / role-management — কিছুই এখানে Hardcode নাই
 
-  if (item.code === 'ADMIN_USERS') {
-    return isPlatformAdmin ? '/admin/users' : '/user-management';
-  }
+  // Backend যে ফিল্ডেই পথ রাখুক, সবগুলা চেক করো — Menu বানানোর সময় "পেজের পথ" এ যা দিছো
+  const raw: any = (item as any).routePath
+    ?? (item as any).pagePath
+    ?? (item as any).path
+    ?? (item as any).url
+    ?? (item as any).route
+    ?? null;
 
-  if (!item.routePath) {
-    return item.routePath;
+  if (!raw) {
+    return null;
   }
 
   // পাথ স্বাভাবিক করা: শুরুতে একটাই "/", শেষে "/" নেই, query নেই
   const path =
     '/' +
-    item.routePath
+    String(raw)
       .split('?')[0]
       .replace(/^\/+/, '')
       .replace(/\/+$/, '');
 
-  if (!isPlatformAdmin) {
-    const map: Record<string, string> = {
-      '/admin/roles': '/role-management',
-      '/admin/users': '/user-management',
-      '/admin/wards': '/wards',
-    };
-    return map[path] ?? path;
-  }
-
   return path;
 }
-
 
 }

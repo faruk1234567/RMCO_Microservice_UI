@@ -64,11 +64,7 @@ getApprovalDetailByCommittee(committeeId: string) {
   );
 }
 
-getApprovalDetail(requestId: string) {
-  return this.http.get<any>(
-    this.workflowApi(`/workflow/approvals/${requestId}/detail`)
-  );
-}
+
 
   // ---------------- Document service ----------------
   uploadDocument(file: File): Observable<Row> {

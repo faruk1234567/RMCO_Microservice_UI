@@ -110,6 +110,27 @@ export const routes: Routes = [
           import('./features/designation/designation-assignment.component')
             .then(m => m.DesignationAssignmentComponent),
       },
+
+      // ---------- ✅ নতুন: পৌরসভার পদবী + দায়িত্ব (কমিটিরটা থেকে আলাদা) ----------
+      {
+        path: 'config/local-body-designations',
+        loadComponent: () =>
+          import('./features/designation/local-body-designation.component')
+            .then(m => m.LocalBodyDesignationComponent),
+      },
+      {
+        path: 'config/local-body-assignments',
+        loadComponent: () =>
+          import('./features/designation/local-body-assignment.component')
+            .then(m => m.LocalBodyAssignmentComponent),
+      },
+      {
+  path: 'config/signature-enroll',
+  loadComponent: () =>
+    import('./features/designation/signature-enroll.component')
+      .then(m => m.SignatureEnrollComponent),
+},
+
       { path: 'config/scopes', loadComponent: () => import('./features/config/scope-tree.component').then(m => m.ScopeTreeComponent) },
       { path: 'config/routes', loadComponent: () => import('./features/config/route-list.component').then(m => m.RouteListComponent) },
       { path: 'config/routes/:id', loadComponent: () => import('./features/config/route-editor.component').then(m => m.RouteEditorComponent) },
@@ -123,6 +144,7 @@ export const routes: Routes = [
       // সিরিয়াল: list → create → :id (create আগে, :id পরে)
       { path: 'tax-proposals', loadComponent: () => import('./features/taxproposal/tax-proposal-list.component').then(m => m.TaxproposalListComponent) },
       { path: 'tax-proposals/create', loadComponent: () => import('./features/taxproposal/tax-proposal-create.component').then(m => m.TaxproposalCreateComponent) },
+      { path: 'tax-proposals/:id/report', loadComponent: () => import('./features/taxproposal/tax-proposal-report.component').then(m => m.TaxProposalReportComponent) },
       { path: 'tax-proposals/:id', loadComponent: () => import('./features/municipal/tax-proposal-detail.component').then(m => m.TaxProposalDetailComponent) },
 
       { path: 'objections', loadComponent: () => import('./features/municipal/objection-list.component').then(m => m.ObjectionListComponent) },
