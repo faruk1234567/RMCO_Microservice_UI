@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-local-body-assignment',
@@ -59,9 +60,13 @@ import { HttpClient } from '@angular/common/http';
                 <td style="padding:10px;border-bottom:1px solid #eee">{{ getUserName(a.userId) }}</td>
                 <td style="padding:10px;border-bottom:1px solid #eee">{{ a.fromDate }}</td>
                 <td style="padding:10px;border-bottom:1px solid #eee">{{ a.hasSignature ? '✔ আছে' : '✘ নাই' }}</td>
-                <td style="padding:10px;border-bottom:1px solid #eee">{{ a.status || 'সক্রিয়' }}</td>
+                <td style="padding:10px;border-bottom:1px solid #eee">{{ a.isActive === false ? 'শেষ' : (a.status || 'সক্রিয়') }}</td>
                 <td style="padding:10px;border-bottom:1px solid #eee">
-                  <button style="padding:6px 10px;border-radius:6px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;cursor:pointer" (click)="endAssignment(a.id)">দায়িত্ব শেষ করুন</button>
+                  @if (a.isActive !== false) {
+                    <button style="padding:6px 10px;border-radius:6px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;cursor:pointer" (click)="endAssignment(a.id)">দায়িত্ব শেষ করুন</button>
+                  } @else {
+                    <span style="color:#6b7280">শেষ</span>
+                  }
                 </td>
               </tr>
             } @empty { <tr><td colspan="6" style="padding:10px;color:#6b7280">এখনো কাউকে দায়িত্ব দেওয়া হয় নাই।</td></tr> }
@@ -73,7 +78,8 @@ import { HttpClient } from '@angular/common/http';
 })
 export class LocalBodyAssignmentComponent implements OnInit {
   private http = inject(HttpClient);
-  private base = 'http://localhost:8095/api/v1';
+  // FIX: সরাসরি 8095 না, Gateway দিয়ে - Enroll এর মতোই
+  private base = environment.signatureUrl; // '/signature-service'
   err = signal(''); okMsg = signal('');
   designations = signal<any[]>([]);
   users = signal<any[]>([]);
@@ -82,16 +88,13 @@ export class LocalBodyAssignmentComponent implements OnInit {
   myMunicipalityId = signal<number | null>(null);
   form: any = { designationId: '', userId: '', fromDate: new Date().toISOString().slice(0, 10) };
 
-  getMyMunicipalityId(): number | null {
-    return this.myMunicipalityId();
-  }
+  getMyMunicipalityId(): number | null { return this.myMunicipalityId(); }
 
   ngOnInit(): void {
     try {
       const me = JSON.parse(localStorage.getItem('user') || localStorage.getItem('currentUser') || '{}');
       const name = me.municipalityName || me.municipality?.name || me.municipalityNameBn || '';
       if (name) this.myMunicipalityName.set(name);
-      // যদি localStorage এ id থাকে, ওইটাই নিবো - নাইলে API থেকে খুঁজবো
       const id = me.municipalityId || me.municipality_id || me.municipality?.id;
       if (id) this.myMunicipalityId.set(Number(id));
     } catch {}
@@ -99,37 +102,29 @@ export class LocalBodyAssignmentComponent implements OnInit {
   }
 
   loadMyMunicipality(): void {
-  // FINAL: আসল User হলো dms_user, user না
-  try {
-    const dmsUser = JSON.parse(localStorage.getItem('dms_user') || '{}');
-    if (dmsUser.municipalityId) {
-      this.myMunicipalityId.set(Number(dmsUser.municipalityId));
-      // নামটা Cache থেকে নিবো - Test Municipality
-      try {
-        const cache = JSON.parse(localStorage.getItem('dms_municipalities_cache') || '{}');
-        const name = cache[String(dmsUser.municipalityId)];
-        if (name) this.myMunicipalityName.set(name);
-      } catch {}
-      this.loadDesignations();
-      this.loadUsers();
-      this.loadAssignments();
-      return;
-    }
-    // যদি dms_user এ না থাকে, তাহলে Token থেকে নিবো
-    const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
-    if (token) {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload.municipalityId) {
-        this.myMunicipalityId.set(Number(payload.municipalityId));
-        this.loadDesignations();
-        this.loadUsers();
-        this.loadAssignments();
-        return;
+    try {
+      const dmsUser = JSON.parse(localStorage.getItem('dms_user') || '{}');
+      if (dmsUser.municipalityId) {
+        this.myMunicipalityId.set(Number(dmsUser.municipalityId));
+        try {
+          const cache = JSON.parse(localStorage.getItem('dms_municipalities_cache') || '{}');
+          const name = cache[String(dmsUser.municipalityId)];
+          if (name) this.myMunicipalityName.set(name);
+        } catch {}
+        this.loadDesignations(); this.loadUsers(); this.loadAssignments(); return;
       }
-    }
-  } catch {}
-  this.err.set('আপনার পৌরসভা পাওয়া যায় নাই। আবার লগইন করেন।');
-}
+      const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.municipalityId) {
+          this.myMunicipalityId.set(Number(payload.municipalityId));
+          this.loadDesignations(); this.loadUsers(); this.loadAssignments(); return;
+        }
+      }
+    } catch {}
+    this.err.set('আপনার পৌরসভা পাওয়া যায় নাই। আবার লগইন করেন।');
+  }
+
   loadDesignations(): void {
     const mid = this.getMyMunicipalityId();
     this.http.get<any>(`${this.base}/local-body/designations?municipalityId=${mid}`).subscribe({
@@ -147,19 +142,19 @@ export class LocalBodyAssignmentComponent implements OnInit {
   }
 
   loadUsers(): void {
-    this.http.get<any>(`/identity-service/api/v1/users/search`, {
-      params: { municipalityId: String(this.getMyMunicipalityId() ?? '') }
+    this.http.get<any>(`http://localhost:8081/api/v1/users`, {
+      params: { municipalityId: String(this.getMyMunicipalityId() ?? ''), size: '100' }
     }).subscribe({
       next: (r) => {
         const list = r?.data?.content ?? r?.content ?? r?.data ?? r;
         const arr = Array.isArray(list) ? list : [];
         this.users.set(arr.map((u: any) => ({
-          id: u.id || u.userId || u.mobile || u.phone,
-          name: u.name || u.fullName || u.citizenName || u.displayName || u.mobile,
+          id: u.id || u.userId,
+          name: u.name || u.nameBn || u.fullName || u.citizenName || u.displayName || u.mobile,
           mobile: u.mobile || u.phone || u.id
         })));
       },
-      error: () => this.users.set([])
+      error: (e) => { console.error('loadUsers failed', e); this.users.set([]); }
     });
   }
 
@@ -168,7 +163,12 @@ export class LocalBodyAssignmentComponent implements OnInit {
     this.http.get<any>(`${this.base}/local-body/assignments?municipalityId=${mid}`).subscribe({
       next: (r) => {
         const list = r?.data?.content ?? r?.data ?? r?.content ?? r;
-        this.assignments.set(Array.isArray(list) ? list : []);
+        const arr = Array.isArray(list) ? list : [];
+        // FIX: Backend signatureDocumentId পাঠায়, hasSignature বানিয়ে নিতে হবে
+        this.assignments.set(arr.map((a: any) => ({
+          ...a,
+          hasSignature: !!a.signatureDocumentId
+        })));
       },
       error: () => this.assignments.set([])
     });
@@ -178,16 +178,25 @@ export class LocalBodyAssignmentComponent implements OnInit {
     if (!this.form.designationId || !this.form.userId) { this.err.set('পদবী আর User ২টাই বাছুন।'); return; }
     const myMid = this.getMyMunicipalityId();
     if (!myMid) { this.err.set('আপনার নিজের কোনো পৌরসভা পাওয়া যায় নাই।'); return; }
+    const alreadyActive = this.assignments().some((a: any) =>
+      String(a.designationId) === String(this.form.designationId) &&
+      a.isActive !== false && a.status !== 'INACTIVE' && a.status !== 'ENDED' && a.status !== 'শেষ'
+    );
+    if (alreadyActive) {
+      const dName = this.designations().find((d: any) => String(d.id) === String(this.form.designationId))?.designationNameBn || 'এই পদবীতে';
+      const existing = this.assignments().find((a: any) => String(a.designationId) === String(this.form.designationId) && a.isActive !== false);
+      this.err.set(`${dName} তে ${this.getUserName(existing?.userId)} ইতিমধ্যে সক্রিয় আছেন। আগে তার দায়িত্ব শেষ করুন, তারপর নতুন জনকে দিন।`);
+      this.okMsg.set(''); return;
+    }
     this.err.set(''); this.okMsg.set('');
     this.http.post<any>(`${this.base}/local-body/assignments`, {
       designationId: this.form.designationId,
       userId: this.form.userId,
-      fromDate: this.form.fromDate
-    }, {
-      headers: { 'X-Municipality-Id': String(myMid) }
-    }).subscribe({
+      fromDate: this.form.fromDate,
+      municipalityId: myMid
+    }, { headers: { 'X-Municipality-Id': String(myMid) } }).subscribe({
       next: () => { this.okMsg.set('দায়িত্ব দেওয়া হইছে।'); this.loadAssignments(); },
-      error: (e) => this.err.set(e?.error?.message || 'সেভ হয় নাই।')
+      error: (e) => this.err.set(e?.error?.message || e?.error?.error || 'সেভ হয় নাই।')
     });
   }
 

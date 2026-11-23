@@ -16,10 +16,13 @@ td{padding:12px 16px;border-top:1px solid #eef1ee;font-size:14px;vertical-align:
 .badge.govt{background:#fff3e0;color:#8a4b00}
 .status{padding:4px 8px;border-radius:999px;font-size:12px;background:#eee}
 .status[data-status='DRAFT']{background:#fef3c7;color:#92400e}
+.status[data-status='SENT_TO_COMMITTEE']{background:#e8def6;color:#5a3a8a}
+.status[data-status='COMMITTEE_APPROVED']{background:#dcfce7;color:#166534}
 .status[data-status='PRE_PUBLISHED']{background:#dbeafe;color:#1e40af}
+.status[data-status='UNDER_OBJECTION_REVIEW']{background:#fef3c7;color:#92400e}
 .status[data-status='FINALIZED']{background:#dcfce7;color:#166534}
+.status[data-status='APPROVED']{background:#dcfce7;color:#166534}
+.status[data-status='REJECTED']{background:#f9dcdc;color:#8a1f1f}
 .actions{display:flex;gap:10px;flex-wrap:wrap}
-.actions a,.link{color:#14532d;font-weight:600;text-decoration:none;background:none;border:0;cursor:pointer;padding:0}
-.link:disabled{color:#b0b8b3;cursor:not-allowed}
 .empty{padding:28px;text-align:center;color:#6b7a70}
 .alert{margin:12px 16px;padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#9a3412;font-size:13px}

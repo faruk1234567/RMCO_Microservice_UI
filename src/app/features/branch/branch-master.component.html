@@ -1,0 +1,65 @@
+<div class="page">
+  <div class="head">
+    <h2>শাখা / উপ-শাখা Master</h2>
+    <p>বিভাগ → শাখা → উপ-শাখা - এইভাবে বানান। Data SQL দিয়ে না, এই Form দিয়ে ঢুকবে।</p>
+  </div>
+
+  <div class="card form-card">
+    <h3>{{ editId ? 'Edit করতেছেন' : 'নতুন শাখা বানান' }}</h3>
+
+    <div class="row">
+      <div class="field">
+        <label>লেভেল *</label>
+        <select [(ngModel)]="form.level" (change)="onLevelChange()">
+          <option value="DEPARTMENT">বিভাগ</option>
+          <option value="BRANCH">শাখা</option>
+          <option value="SUB_BRANCH">উপ-শাখা</option>
+        </select>
+      </div>
+
+      <div class="field" *ngIf="parentList.length">
+        <label>Parent - কোনটার নিচে? *</label>
+        <select [(ngModel)]="form.parentId">
+          <option [ngValue]="null">-- Select --</option>
+          <option *ngFor="let p of parentList" [ngValue]="p.id">{{ p.nameBn }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>নাম (বাংলা) *</label>
+        <input [(ngModel)]="form.nameBn" placeholder="যেমন: ট্যাক্স আদায় শাখা" />
+      </div>
+      <div class="field">
+        <label>নাম (English)</label>
+        <input [(ngModel)]="form.nameEn" placeholder="Tax Collection Branch" />
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" (click)="save()">{{ editId ? 'Update করো' : 'Save করো' }}</button>
+      <button class="btn-ghost" *ngIf="editId" (click)="reset()">বাতিল</button>
+    </div>
+    <p class="msg" *ngIf="msg">{{ msg }}</p>
+
+    <div class="hint">
+      <b>Example:</b> বিভাগ = ট্যাক্স বিভাগ → শাখা = ট্যাক্স আদায় শাখা → উপ-শাখা = হোল্ডিং ট্যাক্স উপ-শাখা
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>সব শাখা <span *ngIf="loading">(লোড হচ্ছে...)</span></h3>
+    <table class="tbl">
+      <thead><tr><th>নাম</th><th>লেভেল</th><th>Parent</th><th></th></tr></thead>
+      <tbody>
+        <tr *ngFor="let b of branches">
+          <td><b>{{ b.nameBn }}</b><br /><small>{{ b.nameEn || '' }}</small></td>
+          <td>{{ levelLabel(b.level) }}</td>
+          <td>{{ parentName(b.parentId) }}</td>
+          <td><button class="btn-small" (click)="edit(b)">Edit</button></td>
+        </tr>
+        <tr *ngIf="!branches.length && !loading"><td colspan="4" class="empty">এখনো কোনো শাখা বানানো হয় নাই।</td></tr>
+      </tbody>
+    </table>
+</div>

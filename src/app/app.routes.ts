@@ -125,6 +125,10 @@ export const routes: Routes = [
             .then(m => m.LocalBodyAssignmentComponent),
       },
       {
+  path: 'config/approval-process',
+  loadComponent: () => import('./features/designation/approval-process.component').then(m => m.ApprovalProcessComponent)
+},
+      {
   path: 'config/signature-enroll',
   loadComponent: () =>
     import('./features/designation/signature-enroll.component')

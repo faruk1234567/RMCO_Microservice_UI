@@ -55,7 +55,7 @@ export class ObjectionApi {
 @Injectable({ providedIn: 'root' })
 export class NoticeApi {
   private http = inject(HttpClient);
-  private u = (p: string) => `${environment.noticeUrl}/notices${p}`;
+ private u = (p: string) => `${environment.notificationUrl}/notices${p}`;
 
   createMessage(body: Row): Observable<Row> { return this.http.post(this.u('/messages'), body).pipe(unwrap()); }
   createCampaign(body: Row): Observable<Row> { return this.http.post(this.u('/campaigns'), body).pipe(unwrap()); }

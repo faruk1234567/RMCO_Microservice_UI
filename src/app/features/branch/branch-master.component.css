@@ -1,0 +1,20 @@
+.page { max-width: 900px; margin: 20px auto; padding: 0 16px; font-family: "Hind Siliguri", Arial, sans-serif; }
+.head h2 { margin: 0; color: #0b5d3b; }
+.head p { color: #66756c; margin: 4px 0 16px; }
+.card { background: #fff; border: 1px solid #dbe3de; border-radius: 8px; padding: 18px; margin-bottom: 16px; }
+.form-card h3, .card h3 { margin: 0 0 14px; color: #0b5d3b; }
+.row { display: flex; gap: 14px; }
+.field { flex: 1; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 13px; font-weight: 600; }
+.field input, .field select { padding: 9px 10px; border: 1px solid #c8d6ce; border-radius: 6px; font-family: inherit; font-size: 14px; }
+.actions { display: flex; gap: 10px; margin-top: 6px; }
+.btn-primary { background: #0b5d3b; color: #fff; border: none; padding: 9px 22px; border-radius: 6px; cursor: pointer; }
+.btn-ghost { background: #eef3f0; border: none; padding: 9px 18px; border-radius: 6px; cursor: pointer; }
+.btn-small { background: #e4f1ea; border: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; }
+.msg { color: #0b5d3b; font-weight: 600; }
+.hint { margin-top: 12px; background: #f6f9f7; padding: 10px; border-radius: 6px; font-size: 13px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th { background: #0b5d3b; color: #fff; padding: 9px 10px; text-align: left; }
+.tbl td { padding: 9px 10px; border-bottom: 1px solid #e3e9e5; }
+.empty { text-align: center; color: #888; padding: 16px; }
+@media (max-width: 700px) { .row { flex-direction: column; gap: 0; } }

@@ -2,7 +2,7 @@ import { Component, computed, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { TaxproposalService } from './tax-proposal.service';
+import { TaxProposalService } from './tax-proposal.service';
 import { CommitteeService } from '../../core/services/committee.service';
 
 @Component({
@@ -28,7 +28,7 @@ export class TaxproposalCreateComponent implements OnInit {
 
   constructor(
     private fb: FormBuilder,
-    private service: TaxproposalService,
+    private service: TaxProposalService,
     private committeeService: CommitteeService,
     private router: Router
   ) {

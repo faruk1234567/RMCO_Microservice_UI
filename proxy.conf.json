@@ -1,45 +1,11 @@
 {
-  
-  "/api/v1/workflow": {
-    "target": "http://localhost:8085",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  },
-  "/api": {
-    "target": "http://localhost:8080",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  },
-  "/identity-service": {
-    "target": "http://localhost:8080",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  },
-  "/config-service": {
-    "target": "http://localhost:8080",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  },
-  "/committee-service": {
-    "target": "http://localhost:8080",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  },
-  "/document-service": {
-    "target": "http://localhost:8080",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "debug"
-  },
- "/api/v1/tax-proposals": {
-  "target": "http://localhost:8091",
-  "secure": false,
-  "changeOrigin": true,
-  "logLevel": "debug"
-}
+  "/api": { "target": "http://127.0.0.1:8080", "secure": false, "changeOrigin": true },
+  "/signature-service": { "target": "http://127.0.0.1:8080", "secure": false, "changeOrigin": true },
+  "/tax-proposal-service": { "target": "http://127.0.0.1:8080", "secure": false, "changeOrigin": true },
+  "/document-service": { "target": "http://127.0.0.1:8080", "secure": false, "changeOrigin": true },
+  "/committee-service": { "target": "http://127.0.0.1:8080", "secure": false, "changeOrigin": true },
+  "/workflow-service": { "target": "http://127.0.0.1:8080", "secure": false, "changeOrigin": true },
+  "/objection-service": { "target": "http://127.0.0.1:8080", "secure": false, "changeOrigin": true },
+  "/notification-service": { "target": "http://127.0.0.1:8080", "secure": false, "changeOrigin": true },
+  "/audit-service": { "target": "http://127.0.0.1:8080", "secure": false, "changeOrigin": true }
 }

@@ -1,92 +1,162 @@
-<div class="pro-report" *ngIf="p">
-  <!-- উপরে - অফিসিয়াল হেডার -->
-  <div class="top-bar">
-    <div class="muni">🏛️ {{ p.municipalityName && p.municipalityName !== '—' ? p.municipalityName : 'পৌরসভা' }}</div>
-    <div class="doc-no">প্রস্তাব নং: <b>{{ p.proposalNo }}</b></div>
-  </div>
+<div class="report-page" *ngIf="proposal">
 
-  <h1>পৌরসভা কর আরোপের প্রস্তাবনা</h1>
-  <p class="sub">পেজ ২ — কমিটির প্রস্তাব &nbsp;|&nbsp; বিধি ৪ অনুযায়ী সরকারের নিকট প্রেরণযোগ্য</p>
-
-  <!-- তথ্য -->
-  <div class="meta-grid">
-    <div><span>শিরোনাম</span><b>{{ p.titleBn }}</b><small>{{ p.titleEn }}</small></div>
-    <div><span>প্রস্তুতকারী কমিটি</span><b>{{ p.committeeName || '—' }}</b></div>
-    <div><span>তৈরি করেছেন</span><b>{{ p.createdByName && p.createdByName !== '—' ? p.createdByName : '—' }}</b></div>
-    <div><span>উদ্দেশ্য</span><b>{{ p.purposeTypeLabel || p.purposeType }}</b><small>{{ p.purposeNote }}</small></div>
-    <div><span>উৎস</span><b>{{ p.sourceTypeLabel || p.sourceType }}</b></div>
-    <div><span>অবস্থা</span><b>{{ p.status === 'DRAFT' ? 'খসড়া' : p.status === 'PRE_PUBLISHED' ? 'প্রাক-প্রকাশিত' : p.status === 'FINALIZED' ? 'চূড়ান্ত' : p.status }}</b><small *ngIf="p.prePublishedOn">প্রাক-প্রকাশ: {{ p.prePublishedOn }} | আপত্তির শেষ: {{ p.objectionDeadline }}</small></div>
-    <div *ngIf="p.proposedEffectiveDate"><span>কার্যকর তারিখ</span><b>{{ p.proposedEffectiveDate }}</b></div>
-    <div *ngIf="p.extraCollectionCost"><span>অতিরিক্ত আদায় খরচ</span><b>{{ p.extraCollectionCost }} টাকা</b></div>
-  </div>
-
-  <!-- ৩ নম্বর - FIX: methodCode "—" হইলেও index দিয়ে লেবেল দেখাবে -->
-  <h2>৩. মূল্যায়ন পদ্ধতির প্রস্তাব <small>— বিধি ১৮(২)</small></h2>
-  <div *ngIf="!p.assessmentMethods?.length" class="empty-box">কোনো মূল্যায়ন পদ্ধতি সেভ হয় নাই। Create ফর্ম থেকে টিক দিয়ে নতুন প্রস্তাব সেভ করুন।</div>
-
-  <div class="method-card" *ngFor="let m of p.assessmentMethods; let i = index">
-    <div class="method-head">
-      <span class="big-tick">{{ m.enabled ? '☑' : '☐' }}</span>
-      <!-- *** এই লাইনটাই ঠিক করছি - methodLabel "—" হইলে index দিয়ে লেবেল *** -->
-      <b>{{ (m.methodLabel && m.methodLabel !== '—') ? m.methodLabel : (i === 0 ? 'সম্পূর্ণ ভাড়া দেওয়া ইমারত — বিধি ১৮(২)(ক)' : i === 1 ? 'সম্পূর্ণ দখলকৃত ইমারত — বিধি ১৮(২)(খ)' : 'আংশিক ভাড়া + আংশিক দখল — বিধি ১৮(২)(গ)') }}</b>
-      <span class="badge" *ngIf="m.enabled">প্রযোজ্য</span>
-      <span class="badge off" *ngIf="!m.enabled">প্রযোজ্য নয়</span>
+  <div class="letterhead">
+    <div class="org"><span class="flag-dot"></span><span class="org-name">{{ municipalityName || 'পৌরসভা' }}</span></div>
+    <div class="doc-meta">
+      <span class="doc-no">প্রস্তাব নং {{ proposal?.proposalNo || proposal?.proposal_no || '—' }}</span>
+      <span class="status-badge" [ngClass]="statusClass">{{ statusLabel(proposal?.status) }}</span>
     </div>
+  </div>
 
-    <div class="ticks" *ngIf="m.enabled">
-      <div *ngIf="m.basisType && m.basisType !== '—'"><b>বার্ষিক মূল্যের ভিত্তি:</b> {{ m.basisType }}</div>
-      <div><span>{{ m.deductMaintenance ? '☑' : '☐' }}</span> রক্ষণাবেক্ষণ বাবদ ২ মাসের ভাড়া বাদ যাইবে</div>
-      <div><span>{{ m.deductMortgageNonCommercial ? '☑' : '☐' }}</span> বাণিজ্যিক না হইলে বন্ধকী সুদ পুরোটা বাদ যাইবে</div>
-      <div><span>{{ m.deductMortgageCommercialOneThird ? '☑' : '☐' }}</span> বাণিজ্যিক হইলে বন্ধকী সুদের ১/৩ অংশ বাদ যাইবে</div>
-      <div><span>{{ m.compareWithMarketRent ? '☑' : '☐' }}</span> ভাড়া অস্বাভাবিক হইলে তুলনামূলক ভাড়া বিবেচনা করা হইবে</div>
-      <div *ngIf="m.note"><b>নোট:</b> {{ m.note }}</div>
-      <!-- ১০৯ / ১১০ এর মতো পুরনো ডাটায় deduct সব false থাকলে এই নোটটা দেখাবে -->
-      <div *ngIf="!m.deductMaintenance && !m.deductMortgageNonCommercial && !m.deductMortgageCommercialOneThird && !m.compareWithMarketRent" class="warn">
-        ⚠️ এই প্রস্তাবে টিকের ডাটা সেভ হয় নাই (পুরনো ফর্ম দিয়ে সেভ করা)। নতুন প্রস্তাবে টিক দিয়ে সেভ করলে এখানে ☑ দেখাবে।
+  <div class="title-block">
+    <h1>পৌরসভা কর আরোপের প্রস্তাবনা</h1>
+    <p class="subtitle">{{ val(proposal,'titleBn','title_bn','title') || '—' }}</p>
+    <p class="legal">বিধি ৩ — কর, করের হার, মূল্যায়ন পদ্ধতি ও আর্থিক ইতিহাস</p>
+  </div>
+
+  <div class="summary">
+    <div><span>প্রস্তাবিত বার্ষিক আনুমানিক আদায়</span><b>৳ {{ fmt(totalProposed) }}</b></div>
+    <div><span>বর্তমান বার্ষিক আদায়</span><b>৳ {{ fmt(totalCurrent) }}</b></div>
+    <div><span>পরিবর্তন</span><b>৳ {{ changeText() }}</b></div>
+    <div><span>অতিরিক্ত আদায় ব্যয়</span><b>৳ {{ fmt(val(proposal,'extraCollectionCost','additionalCost') || 0) }}</b></div>
+  </div>
+
+  <!-- ১. মূল তথ্য -->
+  <section class="block">
+    <h2><span class="no">১</span>মূল তথ্য</h2>
+    <dl class="facts">
+      <div><dt>প্রস্তাব নং</dt><dd>{{ proposal?.proposalNo || proposal?.proposal_no || '—' }}</dd></div>
+      <div><dt>উৎস</dt><dd>{{ val(proposal,'sourceTypeLabel','sourceType') || '—' }}</dd></div>
+      <div><dt>শিরোনাম (বাংলা)</dt><dd>{{ val(proposal,'titleBn','title_bn','title') || '—' }}</dd></div>
+      <div><dt>শিরোনাম (English)</dt><dd>{{ val(proposal,'titleEn','title_en','titleEnglish') || '—' }}</dd></div>
+      <div><dt>প্রস্তুতকারী কমিটি</dt><dd>{{ val(proposal,'committeeName','committee_name') || proposal?.committee?.name || '—' }}</dd></div>
+      <div><dt>প্রস্তাব তৈরির তারিখ</dt><dd>{{ createdDate || '—' }}</dd></div>
+      <div><dt>প্রস্তাবিত কার্যকর তারিখ</dt><dd>{{ formattedDate || '—' }}</dd></div>
+      <div><dt>অবস্থা</dt><dd>{{ statusLabel(proposal?.status) }}</dd></div>
+      <ng-container *ngIf="prePublishedDate">
+        <div><dt>প্রাক-প্রকাশের তারিখ</dt><dd>{{ prePublishedDate }}</dd></div>
+        <div><dt>আপত্তির শেষ তারিখ</dt><dd>{{ objectionDate || '—' }}</dd></div>
+      </ng-container>
+    </dl>
+  </section>
+
+  <!-- ২. কর -->
+  <section class="block">
+    <h2><span class="no">২</span>কোন কোন কর বসবে — বিধি ১৭</h2>
+    <p class="hint">আদর্শ কর তফসিলের সর্বোচ্চ হারের অধিক হারে কোনো কর আরোপ করা যাইবে না — বিধি ৩।</p>
+    <table class="rate-table">
+      <thead>
+        <tr>
+          <th>করের ধরন</th><th>হারের ভিত্তি</th><th class="num">প্রস্তাবিত হার</th><th class="num">প্রস্তাবিত বার্ষিক আনুমানিক আদায় (৳)</th>
+          <th class="num">বর্তমান হার</th><th class="num">বর্তমান বার্ষিক আদায় (৳)</th><th>হারের নোট</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of taxes">
+          <td><b>{{ val(t,'taxTypeName','taxType','name') || '—' }}</b></td>
+          <td>{{ val(t,'rateBasisLabel','rateBasis') || '—' }}</td>
+          <td class="num"><b>{{ rateText(t,'proposedRate') }}</b></td>
+          <td class="num"><b>{{ fmt(val(t,'proposedAnnualCollection','proposedAnnual')) }}</b></td>
+          <td class="num">{{ rateText(t,'existingRate') }}</td>
+          <td class="num">{{ fmt(val(t,'existingAnnualCollection','currentAnnual')) }}</td>
+          <td>{{ val(t,'rateNote','note') || '—' }}</td>
+        </tr>
+        <tr class="total-row" *ngIf="taxes.length">
+          <td colspan="3">সর্বমোট বার্ষিক আনুমানিক আদায়</td>
+          <td class="num">{{ fmt(totalProposed) }}</td>
+          <td></td>
+          <td class="num">{{ fmt(totalCurrent) }}</td>
+          <td></td>
+        </tr>
+        <tr *ngIf="!taxes.length"><td colspan="7" class="empty">এই প্রস্তাবে কোনো কর যোগ করা হয় নাই।</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ৩. মূল্যায়ন পদ্ধতি -->
+  <section class="block">
+    <h2><span class="no">৩</span>মূল্যায়ন পদ্ধতির প্রস্তাব — বিধি ১৮</h2>
+    <p class="hint">এই প্রস্তাবে বার্ষিক মূল্য দেওয়া হয় না। শুধু কোন নিয়মে মূল্যায়ন হবে — সেই নীতির প্রস্তাব করা হইলো।</p>
+
+    <div class="method" *ngFor="let v of valuations">
+      <div class="method-head">
+        <span class="method-title">{{ (v.methodLabel && v.methodLabel !== '—') ? v.methodLabel : 'পদ্ধতি বাছাই করা হয়নি' }}</span>
+        <span class="tag" [class.off]="!v.enabled">{{ v.enabled ? 'এই পদ্ধতি প্রযোজ্য' : 'প্রযোজ্য নয়' }}</span>
+      </div>
+      <div class="basis" *ngIf="showBasis(v)">বার্ষিক মূল্যের ভিত্তি: <b>{{ basisLabel(v.basisType) }}</b></div>
+      <p class="method-desc" *ngIf="methodDesc(v)">{{ methodDesc(v) }}</p>
+      <ul class="rules" *ngIf="methodRules(v).length">
+        <li *ngFor="let r of methodRules(v)" [class.off]="!r.on">
+          <span class="tick">{{ r.on ? '✓' : '–' }}</span>{{ r.text }}
+        </li>
+      </ul>
+      <div class="method-note" *ngIf="v.note"><b>নোট:</b> {{ v.note }}</div>
+    </div>
+    <div class="empty-box" *ngIf="!valuations.length">মূল্যায়ন পদ্ধতি সিলেক্ট করা হয় নাই।</div>
+  </section>
+
+  <!-- ৪. উদ্দেশ্য / আওতা / আদায় -->
+  <section class="block">
+    <h2><span class="no">৪</span>উদ্দেশ্য, আওতা ও আদায়ের ব্যবস্থা</h2>
+    <dl class="facts">
+      <div><dt>উদ্দেশ্যের ধরন</dt><dd>{{ val(proposal,'purposeTypeLabel','purposeType','purpose_type') || '—' }}</dd></div>
+      <div><dt>অতিরিক্ত আদায় ব্যয় (৳)</dt><dd>{{ fmt(val(proposal,'extraCollectionCost','additionalCost') || 0) }}</dd></div>
+    </dl>
+    <div class="prose"><h3>কারা / কোন সম্পত্তি আওতাভুক্ত হইবে</h3><p>{{ val(proposal,'coverageNote','coverage','coveredArea') || '—' }}</p></div>
+    <div class="prose"><h3>আদায়ের ব্যবস্থা</h3><p>{{ val(proposal,'collectionArrangement','collection_method','collection') || '—' }}</p></div>
+    <div class="prose"><h3>উদ্দেশ্যের বিবরণ</h3><p>{{ val(proposal,'purposeNote','purposeDescription','description') || '—' }}</p></div>
+    <div class="prose"><h3>ব্যতিক্রমী প্রভাব</h3><p>{{ val(proposal,'exceptionalNote','exception','exceptionalImpact') || '—' }}</p></div>
+  </section>
+
+  <!-- ৫. আয়-ব্যয় -->
+  <section class="block">
+    <h2><span class="no">৫</span>বিগত ৩ বছরের আয়-ব্যয় — বিধি ৪(ঙ)</h2>
+    <table class="rate-table">
+      <thead><tr><th>অর্থবছর</th><th class="num">আয় (৳)</th><th class="num">ব্যয় (৳)</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let h of histories">
+          <td>{{ val(h,'fiscalYear','fiscal_year','year') || '—' }}</td>
+          <td class="num">{{ fmt(val(h,'income','revenue','totalIncome')) }}</td>
+          <td class="num">{{ fmt(val(h,'expense','expenditure','totalExpense')) }}</td>
+        </tr>
+        <tr class="total-row" *ngIf="histories.length">
+          <td>মোট</td><td class="num">{{ fmt(totalIncome) }}</td><td class="num">{{ fmt(totalExpense) }}</td>
+        </tr>
+        <tr *ngIf="!histories.length"><td colspan="3" class="empty">আয়-ব্যয়ের কোনো তথ্য নেই।</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- স্বাক্ষর -->
+  <div class="sign-area">
+    <div class="sign-note">উপরোক্ত প্রস্তাবটি সঠিক ও সত্য। কমিটির সিদ্ধান্ত অনুযায়ী অনুমোদনের জন্য উপস্থাপন করা হলো।</div>
+    <div class="sign-row">
+      <div class="sign-box">
+        <div class="sign-img-wrap">
+          <img *ngIf="secretarySign" [src]="secretarySign" [alt]="secretaryDesignation" class="sign-img" />
+          <span *ngIf="!secretarySign" class="sign-empty">স্বাক্ষর পাওয়া যায়নি</span>
+        </div>
+        <div class="sign-line"></div>
+        <div class="sign-name">{{ secretaryName || '—' }}</div>
+        <div class="sign-post">{{ secretaryDesignation }}</div>
+        <div class="sign-org">{{ municipalityName }}</div>
+      </div>
+      <div class="sign-seal"><div class="seal-circle"><span>{{ municipalityName || 'পৌরসভা' }}</span><strong>সীল</strong><small>প্রস্তাব নং {{ proposal?.proposalNo }}</small></div></div>
+      <div class="sign-box">
+        <div class="sign-img-wrap">
+          <img *ngIf="mayorSign" [src]="mayorSign" [alt]="mayorDesignation" class="sign-img" />
+          <span *ngIf="!mayorSign" class="sign-empty">স্বাক্ষর পাওয়া যায়নি</span>
+        </div>
+        <div class="sign-line"></div>
+        <div class="sign-name">{{ mayorName || '—' }}</div>
+        <div class="sign-post">{{ mayorDesignation }}</div>
+        <div class="sign-org">{{ municipalityName }}</div>
       </div>
     </div>
-    <p *ngIf="!m.enabled" class="muted">এই পদ্ধতি এই প্রস্তাবে প্রযোজ্য নয়।</p>
+    <div class="sign-date-row"><span>তারিখ: {{ formattedDate }}</span><span>প্রস্তাব নং: {{ proposal?.proposalNo }}</span></div>
+    <div class="print-foot">প্রিন্টের তারিখ: {{ printedOn }}</div>
   </div>
 
-  <!-- করের হার -->
-  <h2>করের হার — প্রস্তাবিত</h2>
-  <table class="items" *ngIf="p.items?.length">
-    <thead>
-      <tr><th>করের ধরন</th><th>হারের ভিত্তি</th><th>বর্তমান হার</th><th>প্রস্তাবিত হার</th><th>বর্তমান বার্ষিক আদায়</th><th>প্রস্তাবিত বার্ষিক আদায়</th><th>মন্তব্য</th></tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let it of p.items">
-        <td>{{ it.taxTypeName || it.taxTypeId }}</td>
-        <td>{{ it.rateBasisLabel || it.rateBasis }}</td>
-        <td>{{ it.existingRate ?? '—' }}</td>
-        <td><b>{{ it.proposedRate ?? '—' }}</b></td>
-        <td>{{ it.existingAnnualCollection ?? '—' }}</td>
-        <td><b>{{ it.proposedAnnualCollection ?? '—' }}</b></td>
-        <td>{{ it.rateNote || '—' }}</td>
-      </tr>
-    </tbody>
-  </table>
-  <p *ngIf="!p.items?.length" class="empty-box">কোনো করের হার সেভ হয় নাই।</p>
-
-  <!-- ৪ নম্বর -->
-  <h2>৪. কারা আওতাভুক্ত</h2>
-  <p class="para">{{ p.coverageNote || '—' }}</p>
-
-  <!-- ৫ নম্বর -->
-  <h2>৫. কারা আদায় করবে ও আদায়ের ব্যবস্থা</h2>
-  <p class="para">{{ p.collectionArrangement || '—' }}</p>
-  <p class="para" *ngIf="p.exceptionalNote"><b>ব্যতিক্রমী বিষয়:</b> {{ p.exceptionalNote }}</p>
-
-  <!-- সাইন -->
-  <div class="sign-row">
-    <div>প্রস্তুতকারী<br/><br/>_________________<br/><b>{{ p.createdByName && p.createdByName !== '—' ? p.createdByName : '—' }}</b></div>
-    <div>সভাপতি, কমিটি<br/><br/>_________________<br/><b>{{ p.committeeName || '—' }}</b></div>
-  </div>
-
-  <div class="no-print actions">
-    <button (click)="print()">🖨️ প্রিন্ট / PDF</button>
-    <a [routerLink]="['/tax-proposals', p.id]">← Detail এ ফিরুন</a>
-  </div>
+  <div class="print-row"><button class="print-btn" (click)="printReport()">🖨️ প্রিন্ট / PDF</button></div>
 </div>
-
-<div *ngIf="!p" class="loading">লোড হচ্ছে...</div>
+<div class="loading" *ngIf="!proposal">রিপোর্ট লোড হচ্ছে...</div>

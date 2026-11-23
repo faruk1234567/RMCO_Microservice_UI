@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-signature-enroll',
@@ -48,7 +49,7 @@ import { HttpClient } from '@angular/common/http';
         <table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:10px;border-bottom:1px solid #eee">পদবী</th><th style="text-align:left;padding:10px;border-bottom:1px solid #eee">সাইন</th><th style="text-align:left;padding:10px;border-bottom:1px solid #eee">অবস্থা</th></tr></thead>
         <tbody>
           @for (s of mySignatures(); track s.id) {
-            <tr><td style="padding:10px;border-bottom:1px solid #eee"><strong>{{ s.designationNameBn || s.designationCode }}</strong></td>
+            <tr><td style="padding:10px;border-bottom:1px solid #eee"><strong>{{ s.designationNameBn }}</strong></td>
             <td style="padding:10px;border-bottom:1px solid #eee">@if (s.imageUrl) { <img [src]="s.imageUrl" style="height:40px;border:1px solid #eee;border-radius:6px" /> } @else { <span style="color:#6b7280">ছবি নাই</span> }</td>
             <td style="padding:10px;border-bottom:1px solid #eee">{{ s.status || 'ACTIVE' }}</td></tr>
           } @empty { <tr><td colspan="3" style="padding:10px;color:#6b7280">এখনো সাইন Enroll করো নাই।</td></tr> }
@@ -59,7 +60,8 @@ import { HttpClient } from '@angular/common/http';
 })
 export class SignatureEnrollComponent implements OnInit {
   private http = inject(HttpClient);
-  private base = 'http://localhost:8095/api/v1';
+  private base = environment.signatureUrl;
+  private docBase = environment.documentUrl;
   err = signal(''); okMsg = signal('');
   myAssignments = signal<any[]>([]);
   mySignatures = signal<any[]>([]);
@@ -67,8 +69,6 @@ export class SignatureEnrollComponent implements OnInit {
   myMunicipalityName = signal('আপনার পৌরসভা');
   myMunicipalityId = signal<number | null>(null);
   form: any = { designationId: '', userId: '' };
-
-  // ✅ এইটা মিসিং ছিলো - ফাইলটা এখানে রাখবো
   selectedFile: File | null = null;
 
   ngOnInit(): void {
@@ -94,31 +94,61 @@ export class SignatureEnrollComponent implements OnInit {
     this.loadMySignatures();
   }
 
-  loadAssignments(): void {
-    this.http.get<any>(`${this.base}/local-body/assignments?userId=${this.form.userId}&municipalityId=${this.myMunicipalityId()}`).subscribe({
-      next: (r) => {
-        const list = r?.data?.content ?? r?.data ?? r?.content ?? r;
-        const arr = Array.isArray(list) ? list : [];
-        // ✅ ডাবল থাকলেও ১টা বানাবে
-        const map = new Map();
-        arr.forEach((a: any) => { if (!map.has(a.designationId)) map.set(a.designationId, a); });
-        this.myAssignments.set([...map.values()]);
-      },
-      error: () => this.myAssignments.set([])
-    });
-  }
+ loadAssignments(): void {
+  this.http.get<any>(`${this.base}/local-body/assignments?municipalityId=${this.myMunicipalityId()}`).subscribe({
+    next: (r) => {
+      const list = r?.data?.content ?? r?.data ?? r?.content ?? r;
+      const arr = Array.isArray(list) ? list : [];
+      // FIX: userId দিয়ে ফিল্টার করবো না, কারণ ২ সার্ভিসের ID আলাদা
+      // শুধু সক্রিয় দায়িত্ব দেখাবো
+      const active = arr.filter((a: any) => a.isActive !== false);
+      const map = new Map();
+      active.forEach((a: any) => { if (!map.has(a.designationId)) map.set(a.designationId, a); });
+      this.myAssignments.set([...map.values()]);
+    },
+    error: () => this.myAssignments.set([])
+  });
+}
 
   loadMySignatures(): void {
     this.http.get<any>(`${this.base}/signatures?userId=${this.form.userId}`).subscribe({
       next: (r) => {
         const list = r?.data?.content ?? r?.data ?? r?.content ?? r;
-        this.mySignatures.set(Array.isArray(list) ? list : []);
+        const arr = Array.isArray(list) ? list : [];
+        const map = new Map<string, any>();
+        arr.sort((a: any, b: any) => new Date(a.signedAt || 0).getTime() - new Date(b.signedAt || 0).getTime())
+          .forEach((s: any) => {
+            const key = String(s.designationSnapshot || s.designationNameBn || s.designationCode || '').trim();
+            if (key) map.set(key, s);
+          });
+        const mapped = [...map.values()].map((s: any) => ({
+          ...s,
+          designationNameBn: s.designationSnapshot || s.designationNameBn || s.designationCode || '',
+          imageUrl: ''
+        }));
+        this.mySignatures.set(mapped);
+        mapped.forEach((s: any, idx: number) => {
+          if (s.documentId) {
+            this.http.get(`${this.docBase}/documents/${s.documentId}/download?municipalityId=${this.myMunicipalityId()}`, { responseType: 'blob' }).subscribe({
+              next: (blob: Blob) => {
+                const url = URL.createObjectURL(blob);
+                const cur = [...this.mySignatures()];
+                cur[idx].imageUrl = url;
+                this.mySignatures.set(cur);
+              },
+              error: () => {
+                const cur = [...this.mySignatures()];
+                cur[idx].imageUrl = s.imageUrl || s.fileUrl || '';
+                this.mySignatures.set(cur);
+              }
+            });
+          }
+        });
       },
       error: () => this.mySignatures.set([])
     });
   }
 
-  // ✅ ঠিক করা - ফাইলটা selectedFile এ রাখে
   onFile(e: any): void {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -129,34 +159,49 @@ export class SignatureEnrollComponent implements OnInit {
   }
 
   save(): void {
-  this.err.set(''); this.okMsg.set('');
-  if (!this.form.designationId) { this.err.set('পদবী বাছাই করুন'); return; }
-  if (!this.selectedFile) { this.err.set('সাইন ফাইল বাছাই করুন'); return; }
+    this.err.set(''); this.okMsg.set('');
+    if (!this.form.designationId) { this.err.set('পদবী বাছাই করুন'); return; }
+    if (!this.selectedFile) { this.err.set('সাইন ফাইল বাছাই করুন'); return; }
+    const chosen = this.myAssignments().find((a: any) => String(a.designationId) === String(this.form.designationId));
+    if (!chosen) { this.err.set('এই পদবী আপনার দায়িত্বে নাই। আগে দায়িত্ব নিন।'); return; }
 
-  const chosen = this.myAssignments().find((a: any) => String(a.designationId) === String(this.form.designationId));
+   const form = new FormData();
+form.append('file', this.selectedFile);
+// FIX: দায়িত্বের userId টাই আসল, লগইনেরটা না। ২টা ID আলাদা।
+const realUserId = chosen?.userId || this.form.userId;
+form.append('userId', realUserId);
+form.append('ownerId', realUserId);
+form.append('entityId', realUserId);
+form.append('sourceId', realUserId);
+form.append('sourceService', 'SIGNATURE_ENROLL');
+form.append('designationId', String(this.form.designationId));
+form.append('designationSnapshot', chosen?.designationNameBn || chosen?.designationCode || '');
+form.append('municipalityId', String(this.myMunicipalityId() ?? ''));
+form.append('nameSnapshot', chosen?.userName || '');
 
-  // ✅ এই ১১ লাইন মিসিং ছিলো - এইটাই আসল FormData
-  const form = new FormData();
-  form.append('file', this.selectedFile);
-  form.append('userId', this.form.userId);
-  form.append('ownerId', this.form.userId);
-  form.append('entityId', this.form.userId);
-  form.append('sourceId', this.form.userId);
-  form.append('sourceService', 'SIGNATURE_ENROLL');
-  form.append('designationId', String(this.form.designationId));
-  form.append('designationSnapshot', chosen?.designationNameBn || chosen?.designationCode || '');
-  form.append('municipalityId', String(this.myMunicipalityId() ?? ''));
-  form.append('nameSnapshot', chosen?.userName || '');
-
-  // ✅ Content-Type দিবেন না - Browser নিজে দিবে
-  this.http.post(`${this.base}/signatures/enroll`, form).subscribe({
-    next: () => {
-      this.okMsg.set('সাইন Save হয়ে গেছে ✔');
-      this.loadMySignatures();
-    },
-    error: (err) => {
-      this.err.set('সাইন Save হয় নাই! Backend 8095 চলছে কিনা দেখো। (' + err.status + ')');
-    }
-  });
-}
+    this.http.post<any>(`${this.base}/signatures/enroll`, form).subscribe({
+      next: (res) => {
+        // FIX 2: সাইন Save হলেই অ্যাসাইনমেন্টে লিংক করবো
+        const signatureId = res?.data?.documentId || res?.data?.id || res?.documentId || res?.id;
+        if (signatureId && chosen?.id) {
+          this.http.put(`${this.base}/local-body/assignments/${chosen.id}/signature`, { signatureDocumentId: signatureId }).subscribe({
+            next: () => {
+              this.okMsg.set('সাইন Save + দায়িত্বে লিংক হয়ে গেছে ✔');
+              this.loadMySignatures();
+            },
+            error: () => {
+              this.okMsg.set('সাইন Save হয়েছে, কিন্তু দায়িত্বে লাগে নাই। আবার চেষ্টা করেন।');
+              this.loadMySignatures();
+            }
+          });
+        } else {
+          this.okMsg.set('সাইন Save হয়ে গেছে ✔');
+          this.loadMySignatures();
+        }
+      },
+      error: (err) => {
+        this.err.set('সাইন Save হয় নাই! Gateway 8080 / Signature 8095 চলছে কিনা দেখো। (' + err.status + ')');
+      }
+    });
+  }
 }

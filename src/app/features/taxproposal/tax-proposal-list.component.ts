@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
-import { TaxproposalService } from './tax-proposal.service';
+import { TaxProposalService } from './tax-proposal.service';
 
 @Component({
   selector: 'app-taxproposal-list',
@@ -20,9 +20,14 @@ export class TaxproposalListComponent implements OnInit {
   // UUID দিয়ে খোঁজার জন্য আলাদা ইনপুট
   searchId = signal('');
 
-  // স্ট্যাটাসের বাংলা
+  // শাখা Map - id -> নাম
+  branchMap = signal<Record<string, string>>({});
+
+  // স্ট্যাটাসের বাংলা - নতুন ২টা যোগ করছি, পুরনোগুলা আছে
   statusBn: Record<string, string> = {
-    DRAFT: 'খসড়া',
+    DRAFT: 'খসড়া - শাখায় আছে',
+    SENT_TO_COMMITTEE: 'কমিটিতে পাঠানো হইছে',
+    COMMITTEE_APPROVED: 'কমিটি অনুমোদন করছে - হেয়ারিংয়ে যাবে',
     PRE_PUBLISHED: 'প্রাক-প্রকাশিত',
     UNDER_OBJECTION_REVIEW: 'আপত্তি পর্যালোচনায়',
     FINALIZED: 'চূড়ান্ত',
@@ -43,40 +48,53 @@ export class TaxproposalListComponent implements OnInit {
   });
 
   constructor(
-    private service: TaxproposalService,
+    private service: TaxProposalService,
     private router: Router
   ) {}
 
   ngOnInit() {
+    this.loadBranches();
     this.load();
+  }
+
+  // ---- শাখা Load - নতুন ----
+  loadBranches() {
+    (this.service as any).listBranches?.().subscribe({
+      next: (res: any) => {
+        const all = Array.isArray(res) ? res : (res?.data ?? res?.content ?? []);
+        const map: Record<string, string> = {};
+        all.forEach((b: any) => { if (b?.id) map[String(b.id)] = b.nameBn || b.nameEn || ''; });
+        this.branchMap.set(map);
+      },
+      error: () => {}
+    });
+  }
+
+  branchName(p: any): string {
+    const map = this.branchMap();
+    const parts = [p.departmentId, p.branchId, p.subBranchId]
+      .map((id: any) => id ? map[String(id)] : '')
+      .filter(Boolean);
+    if (parts.length) return parts.join(' → ');
+    return 'শাখা দেওয়া নাই - পুরনো প্রস্তাবনা';
   }
 
   load() {
     this.loading.set(true);
     this.error.set('');
-    this.service.list().subscribe({
+    (this.service as any).list().subscribe({
       next: (res: any) => {
-        // ব্যাকএন্ড থেকে array আসলে array, না হলে res.data
-        let arr = Array.isArray(res) ? res : (res?.data || []);
-
-        // *** এই ফিল্টারটাই আসল ঠিক ***
-        // /create থেকে আসা ভুল ডাটা বাদ দাও
-        // আসল প্রস্তাবের id অবশ্যই UUID হবে, proposalNo থাকবে
+        let arr = Array.isArray(res) ? res : (res?.data || res?.content || []);
         arr = arr.filter((p: any) => {
           if (!p) return false;
-          // 'create' নামে কোনো প্রস্তাব নাই - এইটা বাদ
           if (p.proposalNo === 'create') return false;
           if (p.id === 'create') return false;
-          // UUID না হলে বাদ - create... এইটা UUID না
           if (!p.id || p.id.length < 30) return false;
           return true;
         });
-
-        // নতুনটা উপরে দেখাও
         arr.sort((a: any, b: any) =>
           new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
         );
-
         this.proposals.set(arr);
         this.loading.set(false);
       },
@@ -87,34 +105,54 @@ export class TaxproposalListComponent implements OnInit {
     });
   }
 
-  // সার্চ বক্সে টাইপ করলে
-  onSearch(event: any) {
-    this.search.set(event.target.value || '');
-  }
+  onSearch(event: any) { this.search.set(event.target.value || ''); }
 
-  // UUID দিয়ে খুঁজুন বাটন
   openById() {
     const id = this.searchId().trim();
     if (!id) return;
     this.router.navigate(['/tax-proposals', id]);
   }
 
-  onSearchId(event: any) {
-    this.searchId.set(event.target.value || '');
-  }
+  onSearchId(event: any) { this.searchId.set(event.target.value || ''); }
 
-  // ডিটেইলসে যাও
   openProposal(p: any) {
     if (!p?.id) return;
     this.router.navigate(['/tax-proposals', p.id]);
   }
 
-  // প্রাক-প্রকাশ বাটন কখন চালু থাকবে
-  canPrePublish(p: any): boolean {
+  // ---- নতুন Flow: শাখা প্রধান পাঠাবে - DRAFT থেকে ----
+  canSendToCommittee(p: any): boolean {
     return p?.status === 'DRAFT';
   }
 
-  // চূড়ান্ত বাটন কখন চালু থাকবে
+  sendToCommittee(p: any) {
+    if (!this.canSendToCommittee(p)) return;
+    if (!confirm(`প্রস্তাব ${p.proposalNo} কমিটির কাছে পাঠাবেন?`)) return;
+    (this.service as any).sendToCommittee(p.id).subscribe({
+      next: () => this.load(),
+      error: (err: any) => alert(err?.error?.message || 'শুধু শাখা প্রধানই পাঠাইতে পারবে')
+    });
+  }
+
+  // ---- নতুন Flow: কমিটি Approve করবে - SENT_TO_COMMITTEE থেকে ----
+  canCommitteeApprove(p: any): boolean {
+    return p?.status === 'SENT_TO_COMMITTEE';
+  }
+
+  committeeApprove(p: any) {
+    if (!this.canCommitteeApprove(p)) return;
+    if (!confirm(`কমিটি প্রস্তাব ${p.proposalNo} অনুমোদন করবে?`)) return;
+    (this.service as any).committeeApprove(p.id).subscribe({
+      next: () => this.load(),
+      error: (err: any) => alert(err?.error?.message || 'কমিটি Approve হয় নাই')
+    });
+  }
+
+  // প্রাক-প্রকাশ বাটন কখন চালু থাকবে - এখন COMMITTEE_APPROVED এর পর
+  canPrePublish(p: any): boolean {
+    return p?.status === 'COMMITTEE_APPROVED' || p?.status === 'DRAFT';
+  }
+
   canFinalize(p: any): boolean {
     return p?.status === 'PRE_PUBLISHED' || p?.status === 'UNDER_OBJECTION_REVIEW';
   }
@@ -122,7 +160,7 @@ export class TaxproposalListComponent implements OnInit {
   prePublish(p: any) {
     if (!this.canPrePublish(p)) return;
     if (!confirm(`প্রস্তাব ${p.proposalNo} প্রাক-প্রকাশ করবেন?`)) return;
-    this.service.prePublish(p.id, {}).subscribe({
+    (this.service as any).prePublish(p.id, {}).subscribe({
       next: () => this.load(),
       error: (err: any) => alert(err?.error?.message || 'প্রাক-প্রকাশ হয়নি')
     });
@@ -131,9 +169,11 @@ export class TaxproposalListComponent implements OnInit {
   finalize(p: any) {
     if (!this.canFinalize(p)) return;
     if (!confirm(`প্রস্তাব ${p.proposalNo} চূড়ান্ত করবেন?`)) return;
-    this.service.finalize(p.id).subscribe({
+    (this.service as any).finalize(p.id).subscribe({
       next: () => this.load(),
       error: (err: any) => alert(err?.error?.message || 'চূড়ান্ত হয়নি')
     });
   }
 }
+
+export { TaxproposalListComponent as TaxProposalListComponent };

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export interface TaxProposalItemRequest {
   taxTypeId?: string | null;
@@ -52,14 +53,25 @@ export interface CreateTaxProposalRequest {
 }
 
 @Injectable({ providedIn: 'root' })
-export class TaxproposalService {
-  private base = '/api/v1/tax-proposals';
-  private configBase = '/config-service/api/v1/config/master-items';
+export class TaxProposalService {
+  // ✅ /tax-proposal-service/tax-proposals
+  // -> Gateway -> /api/v1/tax-proposals
+  private base = `${environment.taxProposalUrl}/tax-proposals`;
+
+  // ✅ Config - Proxy এর সবার উপরের Entry দিয়ে সরাসরি 8090 এ যাবে
+  // Gateway দিয়ে পাঠাইলে Identity তে চলে যাইতো
+  private configBase = `/api/v1/config/master-items`;
 
   constructor(private http: HttpClient) {}
 
-  list(): Observable<any[]> {
-    return this.http.get<any[]>(this.base);
+  list(municipalityId?: number | string | null, page = 0, size = 20): Observable<any> {
+    let params = new HttpParams()
+      .set('page', String(page))
+      .set('size', String(size));
+    if (municipalityId !== undefined && municipalityId !== null && municipalityId !== '') {
+      params = params.set('municipalityId', String(municipalityId));
+    }
+    return this.http.get<any>(this.base, { params });
   }
 
   get(id: string): Observable<any> {
@@ -71,9 +83,9 @@ export class TaxproposalService {
     return this.get(id);
   }
 
-  // কমিটি — Committee Service থেকে
+  // কমিটি — Committee Service থেকে, Gateway দিয়ে
   getCommittees(): Observable<any> {
-    return this.http.get<any>('/committee-service/committees');
+    return this.http.get<any>(`${environment.committeeUrl}/committees`);
   }
 
   // প্রস্তাবের ধরন — Config Service থেকে, মাস্টার আইটেম
@@ -105,13 +117,25 @@ export class TaxproposalService {
   getRateBases(): Observable<any> {
     return this.http.get<any>(`${this.configBase}?group=RATE_BASIS`);
   }
+
   getPurposeTypes(): Observable<any> {
     return this.http.get<any>(`${this.configBase}?group=PURPOSE_TYPE`);
   }
+
   getAssessmentOptions(): Observable<any> {
     return this.http.get<any>(`${this.configBase}?group=ASSESSMENT_METHOD`);
   }
+
   listProposals() {
-    return this.http.get<any[]>(`/api/v1/tax-proposals`);
+    return this.http.get<any>(this.base);
   }
+  listBranches() {
+  return this.http.get(`/tax-proposal-service/branches`);
+}
+sendToCommittee(id: string) {
+  return this.http.post(`/tax-proposal-service/tax-proposals/${id}/send-to-committee`, {});
+}
+committeeApprove(id: string) {
+  return this.http.post(`/tax-proposal-service/tax-proposals/${id}/committee-approve`, {});
+}
 }

@@ -3,19 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Observable, catchError, forkJoin, of } from 'rxjs';
-
 import { EngineApiService } from '../../core/services/engine-api.service';
 import { ConfigAdminService } from '../config/config-admin.service';
 import { ConfigService } from '../../core/services/config.service';
 import { AuthService } from '../../core/services/auth.service';
-
-import {
-  CommitteeTypeRow,
-  Designation,
-  DynamicField,
-  ScopeNode
-} from '../../core/models/config-admin.model';
-
+import { CommitteeTypeRow, Designation, DynamicField, ScopeNode } from '../../core/models/config-admin.model';
 import { flattenTree, versionsOf } from '../config/config-shared';
 import { DocumentUploaderComponent } from '../document/document-uploader.component';
 import { DynamicFormComponent, validateFields } from './dynamic-form.component';
@@ -27,33 +19,26 @@ interface MemberRow {
   name: string;
   mobile: string;
   fields: Record<string, any>;
+  signatureDocumentId?: string | null;
 }
-
 interface NewMember {
   name: string;
   mobile: string;
   fields: Record<string, any>;
-  // --- OTP Flow (NEW) ---
   otp: string;
   otpSent: boolean;
   otpVerified: boolean;
   verifiedName: string;
   otpSending: boolean;
   otpVerifying: boolean;
+  signatureDocumentId: string | null;
 }
-
 const MOBILE_RE = /^01[3-9]\d{8}$/;
 
 @Component({
   selector: 'app-committee-form',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    RouterLink,
-    DynamicFormComponent,
-    DocumentUploaderComponent
-  ],
+  imports: [CommonModule, FormsModule, RouterLink, DynamicFormComponent, DocumentUploaderComponent],
   styles: [ENGINE_STYLES],
   template: `
     <div class="page-container">
@@ -95,7 +80,7 @@ const MOBILE_RE = /^01[3-9]\d{8}$/;
               </div>
               @if (ver(); as v) {
                 <div class="alert alert-info"><strong>{{ v['nameBn'] }}</strong> — মোট সদস্য সর্বোচ্চ {{ v['maxMembers'] || 'সীমাহীন' }}, পদবী {{ (v['designations'] || []).length }}টি।
-                  @if (rule('FORMATION')?.['approvalRequired']) { গঠনের জন্য অনুমোদন লাগবে। } @else { অনুমোদন ছাড়াই সক্রিয় হবে। }
+                  @if (rule('FORMATION')?.['approvalRequired']) { গঠনের জন্য মেয়র / পৌর প্রশাসকের অনুমোদন লাগবে। } @else { অনুমোদন ছাড়াই সক্রিয় হবে। }
                 </div>
               }
               <div class="form-group">
@@ -121,30 +106,31 @@ const MOBILE_RE = /^01[3-9]\d{8}$/;
                   <span [class]="countClass(d)">{{ countOf(d['designationId']) }} জন (কমপক্ষে {{ d['minCount'] || 0 }}, সর্বোচ্চ {{ d['maxCount'] || 'সীমাহীন' }} @if (d['mandatory']) {, বাধ্যতামূলক})</span>
                 </div>
                 <div class="card-body">
-                  @for (m of membersOf(d['designationId']); track $index) {
-                    <div class="row-actions" style="padding:6px 0;border-bottom:1px solid #eef1f2">
-                      <strong>{{ m.name }}</strong><span class="muted">{{ mask(m.mobile) }}</span><span class="grow"></span>
-                      <button class="btn-ghost btn-sm" (click)="removeMember(m)">সরান</button>
+                @for (m of membersOf(d['designationId']); track m.userId) {
+                    <div style="padding:6px 0;border-bottom:1px solid #eef1f2">
+                      <div class="row-actions">
+                        <strong>{{ m.name }}</strong><span class="muted">{{ mask(m.mobile) }}</span>
+                        @if (m.signatureDocumentId) { <span class="muted">✓ সাইন আছে</span> } @else { <span class="muted bad-text">সাইন নেই</span> }
+                        <span class="grow"></span>
+                        <button class="btn-ghost btn-sm" (click)="removeMember(m)">সরান</button>
+                      </div>
+                      <div style="margin-top:8px">
+                        <div class="muted">এই সদস্যের সাইন (ছবি):</div>
+                        <app-document-uploader [allowedFormats]="['JPG','JPEG','PNG']" [maxFileSizeMb]="2" (ready)="onExistingMemberSign(m, $event)" (cleared)="m.signatureDocumentId = null" />
+                      </div>
                     </div>
                   }
-
-                  <!-- FIX 2: Max পূর্ণ হলে Add Form আর দেখাবে না -->
                   @if (canAddMore(d)) {
                     <div class="section-title" style="margin-top:12px">সদস্য যোগ করুন</div>
-
-                    <!-- STEP 1: মোবাইল আগে -->
                     <div class="form-group">
                       <label>মোবাইল নম্বর <span class="required">*</span></label>
                       <input class="form-control" maxlength="11" placeholder="01XXXXXXXXX" [(ngModel)]="nm(d['designationId']).mobile" [disabled]="nm(d['designationId']).otpSent" />
                     </div>
-
                     @if (!nm(d['designationId']).otpSent) {
                       <button class="btn-ghost" (click)="sendMemberOtp(d['designationId'])" [disabled]="nm(d['designationId']).otpSending">
                         {{ nm(d['designationId']).otpSending ? 'পাঠানো হচ্ছে...' : 'OTP পাঠান' }}
                       </button>
                     }
-
-                    <!-- STEP 2: OTP Input — OTP পাঠানোর পরেই দেখাবে -->
                     @if (nm(d['designationId']).otpSent && !nm(d['designationId']).otpVerified) {
                       <div class="alert alert-info" style="margin-top:10px">OTP পাঠানো হয়েছে। মোবাইল চেক করুন।</div>
                       <div class="form-group" style="margin-top:10px">
@@ -158,8 +144,6 @@ const MOBILE_RE = /^01[3-9]\d{8}$/;
                         <button class="btn-ghost" (click)="resendMemberOtp(d['designationId'])" [disabled]="nm(d['designationId']).otpSending">আবার পাঠান</button>
                       </div>
                     }
-
-                    <!-- STEP 3: নামের Field — OTP সঠিক হইলেই জাগবে -->
                     @if (nm(d['designationId']).otpVerified) {
                       <div class="alert alert-ok" style="margin-top:10px">OTP যাচাই সফল হয়েছে।</div>
                       <div class="form-group" style="margin-top:10px">
@@ -168,12 +152,17 @@ const MOBILE_RE = /^01[3-9]\d{8}$/;
                         <div class="muted">Citizen Account থেকে নাম এসেছে।</div>
                       </div>
                       <app-dynamic-form [fields]="memberFields()" [values]="nm(d['designationId']).fields" (valuesChange)="nm(d['designationId']).fields = $event" />
+                      <div class="section-title" style="margin-top:12px">সদস্যের সাইন</div>
+                      <div class="muted">এই সদস্যের সাইন এখানেই আপলোড করুন। সাইন ছাড়াও যোগ করা যাবে।</div>
+                      @if (nm(d['designationId']).signatureDocumentId) {
+                        <div class="alert alert-ok" style="margin-top:8px">সাইন যুক্ত হয়েছে (ID: {{ nm(d['designationId']).signatureDocumentId }})। বদলাতে চাইলে আবার আপলোড করুন।</div>
+                      }
+                      <app-document-uploader [allowedFormats]="['JPG','JPEG','PNG']" [maxFileSizeMb]="2" (ready)="onMemberSign(d['designationId'], $event)" (cleared)="clearMemberSign(d['designationId'])" />
                       <button class="btn-ghost" (click)="addMember(d['designationId'])">+ যোগ করুন</button>
                     }
                   } @else {
                     <div class="alert alert-info" style="margin-top:12px">এই পদে সর্বোচ্চ {{ d['maxCount'] }} জন যোগ হয়ে গেছে। সরান চাপলে আবার যোগ করতে পারবেন।</div>
                   }
-
                   @if (memberError(d['designationId'])) {
                     <div class="muted bad-text" style="margin-bottom:6px;margin-top:8px">{{ memberError(d['designationId']) }}</div>
                   }
@@ -195,14 +184,14 @@ const MOBILE_RE = /^01[3-9]\d{8}$/;
               <app-dynamic-form [fields]="resolutionFields()" [values]="form.resolution.fields" (valuesChange)="form.resolution.fields = $event" />
               <div class="section-title" style="margin-top:12px">প্রস্তাবের নথি</div>
               @if (form.resolution.documentId) { <div class="alert alert-ok">নথি সংযুক্ত হয়েছে (ID: {{ form.resolution.documentId }})।</div> }
-              <app-document-uploader (ready)="onDoc($event)" (cleared)="form.resolution.documentId = null" />
+             <app-document-uploader [allowedFormats]="['PDF']" [maxFileSizeMb]="5" (ready)="onDoc($event)" (cleared)="form.resolution.documentId = null" />
             </div></div>
           }
           @case (4) {
             <div class="card mb-2"><div class="card-header"><h3>সারসংক্ষেপ</h3></div><div class="card-body">
-              <dl class="kv"><dt>কমিটির নাম</dt><dd>{{ form.nameBn }} {{ form.nameEn }}</dd><dt>ধরন</dt><dd>{{ ver()?.['nameBn'] }} (নিয়মমালা{{ ver()?.['versionNo'] }})</dd><dt>কার্যপরিধি</dt><dd>{{ nodeName() }}</dd><dt>সদস্য</dt><dd>{{ form.members.length }} জন</dd><dt>প্রস্তাব</dt><dd>{{ form.resolution.number || '—' }} · {{ form.resolution.date || '—' }} · {{ form.resolution.documentId ? 'নথি আছে' : 'নথি নেই' }}</dd><dt>অনুমোদন</dt><dd>{{ rule('FORMATION')?.['approvalRequired'] ? 'লাগবে' : 'লাগবে না' }}</dd></dl>
+              <dl class="kv"><dt>কমিটির নাম</dt><dd>{{ form.nameBn }} {{ form.nameEn }}</dd><dt>ধরন</dt><dd>{{ ver()?.['nameBn'] }} (নিয়মমালা{{ ver()?.['versionNo'] }})</dd><dt>কার্যপরিধি</dt><dd>{{ nodeName() }}</dd><dt>সদস্য</dt><dd>{{ form.members.length }} জন</dd><dt>প্রস্তাব</dt><dd>{{ form.resolution.number || '—' }} · {{ form.resolution.date || '—' }} · {{ form.resolution.documentId ? 'নথি আছে' : 'নথি নেই' }}</dd><dt>অনুমোদন</dt><dd>{{ rule('FORMATION')?.['approvalRequired'] ? 'মেয়র / পৌর প্রশাসক' : 'লাগবে না' }}</dd></dl>
               <div class="section-title" style="margin-top:14px">সদস্য তালিকা</div>
-              <table class="data-table"><thead><tr><th>পদবী</th><th>নাম</th><th>মোবাইল</th></tr></thead><tbody>@for (m of form.members; track $index) { <tr><td>{{ desigName(m.designationId) }}</td><td>{{ m.name }}</td><td>{{ mask(m.mobile) }}</td></tr> } </tbody></table>
+              <table class="data-table"><thead><tr><th>পদবী</th><th>নাম</th><th>মোবাইল</th><th>স্বাক্ষর</th></tr></thead><tbody>@for (m of form.members; track $index) { <tr><td>{{ desigName(m.designationId) }}</td><td>{{ m.name }}</td><td>{{ mask(m.mobile) }}</td><td>{{ m.signatureDocumentId ? 'আছে' : 'নেই' }}</td></tr> } </tbody></table>
             </div></div>
             @if (problems().length) { <div class="alert alert-err">জমা দেওয়ার আগে এগুলো ঠিক করুন:<ul>@for (p of problems(); track $index) { <li>{{ p }}</li> }</ul></div> } @else { <div class="alert alert-ok">সব তথ্য ঠিক আছে। জমা দিতে প্রস্তুত।</div> }
           }
@@ -224,7 +213,6 @@ export class CommitteeFormComponent implements OnInit {
   private auth = inject(AuthService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-
   steps = ['ধরন ও কার্যপরিধি','সদস্য নির্বাচন','বাড়তি তথ্য','প্রস্তাব ও নথি','পর্যালোচনা ও জমা'];
   step = signal(0);
   maxStep = signal(0);
@@ -260,12 +248,10 @@ export class CommitteeFormComponent implements OnInit {
   desigName = (id: string) => this.designations().find(d => String(d.id) === String(id))?.nameBn ?? id;
   membersOf = (id: string) => this.form.members.filter(m => String(m.designationId) === String(id));
   countOf = (id: string) => this.membersOf(id).length;
-  // FIX 2: এই পদে আর যোগ করা যাবে কিনা
   canAddMore = (d: Row): boolean => { const max = d['maxCount']; if (!max) return true; return this.countOf(String(d['designationId'])) < Number(max); };
-  nm(id: string): NewMember { return (this.newMembers[id] ??= { name: '', mobile: '', fields: {}, otp: '', otpSent: false, otpVerified: false, verifiedName: '', otpSending: false, otpVerifying: false }); }
+  nm(id: string): NewMember { return (this.newMembers[id] ??= { name: '', mobile: '', fields: {}, otp: '', otpSent: false, otpVerified: false, verifiedName: '', otpSending: false, otpVerifying: false, signatureDocumentId: null }); }
   memberError = (id: string) => this.memberErr[id] ?? '';
   countClass(d: Row): string { const n = this.countOf(String(d['designationId'])); const bad = n < (d['minCount'] || (d['mandatory'] ? 1 : 0)) || (!!d['maxCount'] && n > d['maxCount']); return bad ? 'st st-REJECTED' : 'st st-ACTIVE'; }
-
   ngOnInit(): void {
     forkJoin({ types: this.cfgAdmin.listTypes(true).pipe(catchError(() => of([] as CommitteeTypeRow[]))), levels: this.cfgAdmin.listScopeLevels().pipe(catchError(() => of([] as any[]))), tree: this.cfgAdmin.scopeTree().pipe(catchError(() => of([] as ScopeNode[]))), desig: this.cfg.listDesignations().pipe(catchError(() => of([] as Designation[]))) }).subscribe(({ types, levels, tree, desig }) => {
       const levelMap = new Map(levels.map((level: any) => [String(level.id), level]));
@@ -299,8 +285,6 @@ export class CommitteeFormComponent implements OnInit {
       this.ver.set(normalizedVersion); this.err.set('');
     }, error: e => { this.ver.set(null); this.err.set(errMsg(e)); } });
   }
-
-  // ============ FIX 1: OTP FLOW ============
   sendMemberOtp(desigId: string): void {
     const n = this.nm(desigId); const mobile = n.mobile.trim();
     if (!MOBILE_RE.test(mobile)) { this.memberErr[desigId] = 'সঠিক ১১ সংখ্যার মোবাইল নম্বর দিন।'; return; }
@@ -311,12 +295,11 @@ export class CommitteeFormComponent implements OnInit {
   resendMemberOtp(desigId: string): void { const n = this.nm(desigId); n.otpSent = false; this.sendMemberOtp(desigId); }
   verifyMemberOtp(desigId: string): void {
     const n = this.nm(desigId); const mobile = n.mobile.trim(); const otp = n.otp.trim();
-    if (!/^\d{6}$/.test(otp)) { this.memberErr[desigId] = '৬ সংখ্যার সঠিক OTP কোড দিন।'; return; }
+    if (/^\d{6}$/.test(otp) === false) { this.memberErr[desigId] = '৬ সংখ্যার সঠিক OTP কোড দিন।'; return; }
     this.memberErr[desigId] = ''; n.otpVerifying = true;
     this.auth.verifyOtp(mobile, otp, 'COMMITTEE_MEMBER').subscribe({ next: (res: any) => {
       n.otpVerifying = false; const data = res?.data ?? res;
       if (data?.valid === false || data?.success === false) { this.memberErr[desigId] = 'OTP সঠিক নয়।'; return; }
-      // OTP সঠিক — এখন Citizen খুঁজে নাম আনবো
       this.api.searchCitizenByMobile(mobile).subscribe({ next: (users: Row[]) => {
         const citizen = users.find(u => String(u['mobile'] ?? '').replace(/\D/g, '') === mobile);
         if (!citizen?.['id']) { this.memberErr[desigId] = 'এই মোবাইল নম্বরে কোনো Citizen Account পাওয়া যায়নি। আগে Citizen Registration করুন।'; return; }
@@ -325,10 +308,25 @@ export class CommitteeFormComponent implements OnInit {
       }, error: () => { this.memberErr[desigId] = 'Citizen Account খুঁজতে সমস্যা হয়েছে। Identity Service এবং permission পরীক্ষা করুন।'; } });
     }, error: (e) => { n.otpVerifying = false; this.memberErr[desigId] = e?.error?.message || 'OTP যাচাই ব্যর্থ।'; } });
   }
-
+  onMemberSign(desigId: string, d: Row): void {
+    const rawId = d?.['id'] ?? d?.['documentId'];
+    const documentId = typeof rawId === 'string' ? rawId.trim() : '';
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(documentId)) { this.memberErr[desigId] = 'বৈধ Document UUID পাওয়া যায়নি।'; return; }
+    const n = this.nm(desigId);
+    n.signatureDocumentId = documentId;
+    this.memberErr[desigId] = '';
+  }
+  clearMemberSign(desigId: string): void { this.nm(desigId).signatureDocumentId = null; }
+  onExistingMemberSign(m: MemberRow, d: Row): void {
+    const rawId = d?.['id'] ?? d?.['documentId'];
+    const documentId = typeof rawId === 'string' ? rawId.trim() : '';
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidPattern.test(documentId)) return;
+    m.signatureDocumentId = documentId;
+  }
   addMember(desigId: string): void {
     const n = this.nm(desigId); const mobile = n.mobile.trim();
-    // OTP Verify ছাড়া যোগ হবে না
     if (!n.otpVerified) { this.memberErr[desigId] = 'আগে OTP যাচাই করুন।'; return; }
     const name = (n.verifiedName || n.name).trim();
     const designationId = Number(desigId);
@@ -345,18 +343,18 @@ export class CommitteeFormComponent implements OnInit {
     this.api.searchCitizenByMobile(mobile).subscribe({ next: (users: Row[]) => {
       const citizen = users.find(u => String(u['mobile'] ?? '').replace(/\D/g, '') === mobile);
       if (!citizen?.['id']) { this.memberErr[desigId] = 'এই মোবাইল নম্বরে কোনো Citizen Account পাওয়া যায়নি। আগে Citizen Registration করুন.'; return; }
-      this.form.members = [...this.form.members, { userId: String(citizen['id']), designationId: String(designationId), name: String(citizen['nameBn'] || citizen['nameEn'] || name), mobile: String(citizen['mobile'] || mobile), fields: { ...n.fields } }];
-      this.newMembers[desigId] = { name: '', mobile: '', fields: {}, otp: '', otpSent: false, otpVerified: false, verifiedName: '', otpSending: false, otpVerifying: false };
+      this.form.members = [...this.form.members, { userId: String(citizen['id']), designationId: String(designationId), name: String(citizen['nameBn'] || citizen['nameEn'] || name), mobile: String(citizen['mobile'] || mobile), fields: { ...n.fields }, signatureDocumentId: n.signatureDocumentId ?? null }];
+      this.newMembers[desigId] = { name: '', mobile: '', fields: {}, otp: '', otpSent: false, otpVerified: false, verifiedName: '', otpSending: false, otpVerifying: false, signatureDocumentId: null };
       this.memberErr[desigId] = '';
     }, error: (err) => { console.error('Citizen search failed:', err); this.memberErr[desigId] = 'Citizen Account খুঁজতে সমস্যা হয়েছে। Identity Service এবং permission পরীক্ষা করুন।'; } });
   }
   removeMember(m: MemberRow): void { this.form.members = this.form.members.filter(x => x !== m); }
-  onDoc(d: Row): void { const rawId = d?.['id'] ?? d?.['documentId']; const documentId = typeof rawId === 'string' ? rawId.trim() : ''; const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i; if (!uuidPattern.test(documentId)) { this.form.resolution.documentId = null; this.err.set('বৈধ Document UUID পাওয়া যায়নি।'); return; } this.form.resolution.documentId = documentId; this.err.set(''); const id = this.draftId(); if (id) { this.api.attachUsage(documentId, 'COMMITTEE_DRAFT', id).subscribe({ error: e => this.err.set('নথি সংযুক্ত করা যায়নি: ' + errMsg(e)) }); } }
+  onDoc(d: Row): void { const rawId = d?.['id'] ?? d?.['documentId']; const documentId = typeof rawId === 'string' ? rawId.trim() : ''; const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i; if (!uuidPattern.test(documentId)) { this.form.resolution.documentId = null; this.err.set('বৈধ Document UUID পাওয়া যায়নি।'); return; } this.form.resolution.documentId = documentId; this.err.set(''); const id = this.draftId(); if (id) { this.api.attachUsage(documentId, 'COMMITTEE_DRAFT', id).subscribe({ error: (e: any) => this.err.set('নথি সংযুক্ত করা যায়নি: ' + errMsg(e)) }); } }
   stepError(): string { switch (this.step()) { case 0: if (!this.versionId || !this.ver()) return 'কমিটির ধরন ও সংস্করণ বাছাই করুন।'; if (!this.form.scopeNodeId) return 'কার্যপরিধির node বাছাই করুন।'; if (!this.form.nameBn.trim()) return 'কমিটির নাম দিন।'; return ''; case 1: return this.memberProblems()[0] ?? ''; case 2: return validateFields(this.committeeFields(), this.form.fields)[0] ?? ''; case 3: return this.resolutionProblems()[0] ?? ''; default: return ''; } }
   private memberProblems(): string[] { const p: string[] = []; for (const d of this.designationRules()) { const n = this.countOf(d['designationId']); const name = this.desigName(d['designationId']); const min = d['minCount'] || (d['mandatory'] ? 1 : 0); if (n < min) p.push(`${name}: কমপক্ষে ${min} জন দরকার (এখন ${n})`); if (d['maxCount'] && n > d['maxCount']) p.push(`${name}: সর্বোচ্চ ${d['maxCount']} জন`); } const max = this.ver()?.['maxMembers']; if (max && this.form.members.length > max) p.push(`মোট সদস্য সর্বোচ্চ ${max} জন`); return p; }
   private resolutionProblems(): string[] { const p: string[] = []; if (this.rule('FORMATION')?.['resolutionRequired']) { if (!this.form.resolution.number.trim()) p.push('প্রস্তাব নম্বর দিন'); if (!this.form.resolution.date) p.push('প্রস্তাবের তারিখ দিন'); if (!this.form.resolution.documentId) p.push('প্রস্তাবের নথি আপলোড করুন (স্ক্যান শেষ হওয়া পর্যন্ত অপেক্ষা করুন)'); } return [...p, ...validateFields(this.resolutionFields(), this.form.resolution.fields, 'প্রস্তাব: ')]; }
   problems = (): string[] => { const p: string[] = []; if (!this.ver()) return ['কমিটির ধরন বাছাই করুন']; if (!this.form.scopeNodeId) p.push('কার্যপরিধির node বাছাই করুন'); if (!this.form.nameBn.trim()) p.push('কমিটির নাম দিন'); p.push(...this.memberProblems()); for (const m of this.form.members) p.push(...validateFields(this.memberFields(), m.fields, `${m.name}: `)); p.push(...validateFields(this.committeeFields(), this.form.fields)); p.push(...this.resolutionProblems()); return p; };
-  private payload(): any { return { code: `COM-${Date.now()}`, nameBn: this.form.nameBn.trim(), nameEn: this.form.nameEn.trim(), scopeNodeId: this.form.scopeNodeId, termStart: new Date().toISOString(), termEnd: new Date(Date.now() + 365*24*60*60*1000).toISOString(), dynamicValues: this.form.fields, members: this.form.members.map(m => ({ userId: m.userId, designationId: String(Number(m.designationId)), name: m.name, mobile: m.mobile, isPrimary: false, dynamicValues: m.fields })), documents: this.form.resolution.documentId ? [{ documentId: this.form.resolution.documentId, role: 'PROPOSAL' }] : [] }; }
+  private payload(): any { return { code: `COM-${Date.now()}`, nameBn: this.form.nameBn.trim(), nameEn: this.form.nameEn.trim(), scopeNodeId: this.form.scopeNodeId, termStart: new Date().toISOString(), termEnd: new Date(Date.now() + 365*24*60*60*1000).toISOString(), dynamicValues: this.form.fields, members: this.form.members.map(m => ({ userId: m.userId, designationId: String(Number(m.designationId)), name: m.name, mobile: m.mobile, isPrimary: false, dynamicValues: m.fields, signatureDocumentId: m.signatureDocumentId ?? null })), documents: this.form.resolution.documentId ? [{ documentId: this.form.resolution.documentId, role: 'PROPOSAL' }] : [] }; }
   private save$(): Observable<Row> { const id = this.draftId(); const payload = this.payload(); if (id) return this.api.updateDraft(id, payload); return new Observable<Row>(sub => { this.api.createDraft({ typeVersionId: this.versionId, payload: payload }).subscribe({ next: (r) => { const draftId = r['draftId']; if (!draftId) { sub.error(new Error('Backend response-এ draftId পাওয়া যায়নি।')); return; } this.draftId.set(String(draftId)); sub.next(r); sub.complete(); }, error: (e) => sub.error(e) }); }); }
   private stamp(): void { this.savedAt.set(new Date().toLocaleTimeString('bn-BD')); }
   next(): void { this.busy.set(true); this.err.set(''); this.save$().subscribe({ next: () => { this.busy.set(false); this.stamp(); const n = this.step() + 1; this.step.set(n); this.maxStep.set(Math.max(this.maxStep(), n)); }, error: (e) => { this.busy.set(false); this.err.set(errMsg(e)); } }); }

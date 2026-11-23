@@ -5,15 +5,11 @@ import {
   inject,
   signal
 } from '@angular/core';
-
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-
 import { catchError, of } from 'rxjs';
-
 import { EngineApiService } from '../../core/services/engine-api.service';
 import { ConfigService } from '../../core/services/config.service';
-
 import {
   ENGINE_STYLES,
   Row,
@@ -31,104 +27,26 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
   selector: 'app-committee-detail',
   standalone: true,
   imports: [CommonModule, RouterLink],
-
   styles: [
     ENGINE_STYLES,
-
     `
-      .complete-info {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-      }
-
-      .info-card {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        overflow: hidden;
-      }
-
-      .info-card-header {
-        padding: 16px 20px;
-        border-bottom: 1px solid #e2e8f0;
-        background: #f8fafc;
-      }
-
-      .info-card-header h3 {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 600;
-        color: #0f172a;
-      }
-
-      .info-card-body {
-        padding: 20px;
-      }
-
-      .info-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 22px 30px;
-      }
-
-      .info-item {
-        display: flex;
-        flex-direction: column;
-        gap: 7px;
-        min-width: 0;
-      }
-
-      .info-label {
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-      }
-
-      .info-value {
-        color: #0f172a;
-        font-size: 14px;
-        font-weight: 600;
-        overflow-wrap: anywhere;
-      }
-
-      .info-status {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .info-count {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 32px;
-        height: 28px;
-        padding: 0 10px;
-        border-radius: 6px;
-        background: #f1f5f9;
-        border: 1px solid #e2e8f0;
-        color: #334155;
-        font-weight: 600;
-        font-size: 13px;
-      }
-
-      .info-extra {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 18px 30px;
-      }
-
-      /* --- Professional Badge --- */
+      .complete-info { display: flex; flex-direction: column; gap: 20px; }
+      .info-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+      .info-card-header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+      .info-card-header h3 { margin: 0; font-size: 16px; font-weight: 600; color: #0f172a; }
+      .info-card-body { padding: 20px; }
+      .info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 30px; }
+      .info-item { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+      .info-label { color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+      .info-value { color: #0f172a; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+      .info-status { display: flex; align-items: center; gap: 8px; }
+      .info-count { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 28px; padding: 0 10px; border-radius: 6px; background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155; font-weight: 600; font-size: 13px; }
+      .info-extra { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 30px; }
       .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1.4; border: 1px solid transparent; white-space: nowrap; }
       .badge-success { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
       .badge-primary { background: #eff6ff; color: #1d4ed8; border-color: #dbeafe; }
       .badge-danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
       .badge-muted { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
-
-      /* --- Status Pill with Dot --- */
       .st { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
       .st::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
       .st-DRAFT { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
@@ -136,245 +54,68 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
       .st-ACTIVE, .st-APPROVED { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
       .st-REJECTED { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
       .st-CANCELLED { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
-
-      /* APPROVAL TIMELINE - PROFESSIONAL */
-      .approval-card {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        margin-bottom: 20px;
-        overflow: hidden;
-      }
-
-      .approval-header {
-        padding: 16px 20px;
-        border-bottom: 1px solid #e2e8f0;
-        background: #f8fafc;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .approval-header h3 {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 600;
-        color: #0f172a;
-      }
-
-      .approval-body {
-        padding: 20px;
-      }
-
-      .approval-summary-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .progress-bar {
-        height: 6px;
-        background: #e2e8f0;
-        border-radius: 999px;
-        overflow: hidden;
-        margin: 10px 0 16px;
-      }
-
-      .progress-fill {
-        height: 100%;
-        background: #1d4ed8;
-        border-radius: 999px;
-        transition: width 0.3s;
-      }
-
-      .progress-fill.done {
-        background: #059669;
-      }
-
-      .progress-fill.rejected {
-        background: #dc2626;
-      }
-
-      .timeline-item {
-        display: flex;
-        gap: 14px;
-        padding: 16px;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        background: #fff;
-      }
-
-      .timeline-item.approved {
-        border-left: 3px solid #059669;
-      }
-
-      .timeline-item.current {
-        border-left: 3px solid #1d4ed8;
-        background: #f8fafc;
-      }
-
-      .timeline-item.pending {
-        border-left: 3px solid #e2e8f0;
-      }
-
-      .timeline-item.rejected {
-        border-left: 3px solid #dc2626;
-      }
-
-      .timeline-item.cancelled {
-        border-left: 3px solid #cbd5e1;
-        background: #f8fafc;
-        opacity: 0.85;
-      }
-
-      .timeline-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: #cbd5e1;
-        margin-top: 6px;
-        flex-shrink: 0;
-      }
-
+      .approval-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
+      .approval-header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .approval-header h3 { margin: 0; font-size: 16px; font-weight: 600; color: #0f172a; }
+      .approval-body { padding: 20px; }
+      .approval-summary-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .progress-bar { height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin: 10px 0 16px; }
+      .progress-fill { height: 100%; background: #1d4ed8; border-radius: 999px; transition: width 0.3s; }
+      .progress-fill.done { background: #059669; }
+      .progress-fill.rejected { background: #dc2626; }
+      .timeline-item { display: flex; gap: 14px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; background: #fff; }
+      .timeline-item.approved { border-left: 3px solid #059669; }
+      .timeline-item.current { border-left: 3px solid #1d4ed8; background: #f8fafc; }
+      .timeline-item.pending { border-left: 3px solid #e2e8f0; }
+      .timeline-item.rejected { border-left: 3px solid #dc2626; }
+      .timeline-item.cancelled { border-left: 3px solid #cbd5e1; background: #f8fafc; opacity: 0.85; }
+      .timeline-dot { width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; margin-top: 6px; flex-shrink: 0; }
       .timeline-item.approved .timeline-dot { background: #059669; }
       .timeline-item.current .timeline-dot { background: #1d4ed8; box-shadow: 0 0 0 4px #dbeafe; }
       .timeline-item.rejected .timeline-dot { background: #dc2626; }
       .timeline-item.cancelled .timeline-dot { background: #94a3b8; }
-
-      .timeline-content {
-        flex: 1;
-        min-width: 0;
-      }
-
-      .step-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-      }
-
-      .decision-meta {
-        font-size: 13px;
-        color: #475569;
-        margin-top: 8px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        line-height: 1.6;
-      }
-
+      .timeline-content { flex: 1; min-width: 0; }
+      .step-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .decision-meta { font-size: 13px; color: #475569; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; line-height: 1.6; }
       .decision-meta b { color: #0f172a; font-weight: 600; }
-
-      .comment-box {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-left: 3px solid #94a3b8;
-        border-radius: 6px;
-        padding: 10px 12px;
-        font-size: 13px;
-        color: #334155;
-        margin-top: 8px;
-      }
-
-      @media (max-width: 768px) {
-        .info-grid,
-        .info-extra {
-          grid-template-columns: 1fr;
-        }
-
-        .info-card-body {
-          padding: 15px;
-        }
-      }
+      .comment-box { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #94a3b8; border-radius: 6px; padding: 10px 12px; font-size: 13px; color: #334155; margin-top: 8px; }
+      @media (max-width: 768px) { .info-grid, .info-extra { grid-template-columns: 1fr; } .info-card-body { padding: 15px; } }
     `
   ],
-
   template: `
     <div class="page-container">
-
-      <!-- HEADER -->
       <div class="page-header">
-
         <div>
-          <a routerLink="/committee" class="muted">
-            ← কমিটির তালিকা
-          </a>
-
+          <a routerLink="/committee" class="muted">← কমিটির তালিকা</a>
           <h1>
             {{ title() }}
-
             @if (c()) {
-              <span [class]="'st st-' + effectiveStatus()">
-                {{ bn(effectiveStatus()) }}
-              </span>
+              <span [class]="'st st-' + effectiveStatus()">{{ bn(effectiveStatus()) }}</span>
             }
           </h1>
         </div>
-
         @if (c() && c()!['status'] === 'DRAFT') {
-          <a
-            class="btn btn-primary"
-            routerLink="/committee/create"
-            [queryParams]="{ draftId: c()!['id'] }"
-          >
-            খসড়া সম্পাদনা
-          </a>
+          <a class="btn btn-primary" routerLink="/committee/create" [queryParams]="{ draftId: c()!['id'] }">খসড়া সম্পাদনা</a>
         }
-
       </div>
-
-      <!-- ERROR -->
-      @if (err()) {
-        <div class="alert alert-err">
-          {{ err() }}
-        </div>
-      }
-
-      <!-- LOADING -->
-      @if (loading()) {
-        <div class="empty">
-          লোড হচ্ছে...
-        </div>
-      }
-
+      @if (err()) { <div class="alert alert-err">{{ err() }}</div> }
+      @if (loading()) { <div class="empty">লোড হচ্ছে...</div> }
       @else if (c()) {
-
-        <!-- STATUS MESSAGES -->
         @if (isRejected()) {
           <div class="alert alert-err">
             এই কমিটি প্রত্যাখ্যাত হয়েছে।
-            @if (rejectedStep(); as rs) {
-              ধাপ {{ rs.stepNo }} এ প্রত্যাখ্যাত।
-            }
-            @if (rejectReason()) {
-              কারণ: {{ rejectReason() }}
-            }
+            @if (rejectedStep(); as rs) { মেয়র প্রত্যাখ্যান করেছেন। }
+            @if (rejectReason()) { কারণ: {{ rejectReason() }} }
           </div>
-        } @else if (
-          c()!['status'] === 'SUBMITTED' ||
-          c()!['status'] === 'UNDER_APPROVAL'
-        ) {
-          <div class="alert alert-info">
-            অনুমোদন চলছে। অনুমোদনকারীরা সিদ্ধান্ত দিলে
-            অবস্থা নিজে থেকে বদলাবে।
-          </div>
+        } @else if (c()!['status'] === 'SUBMITTED' || c()!['status'] === 'UNDER_APPROVAL') {
+          <div class="alert alert-info">অনুমোদন চলছে। অনুমোদনকারীরা সিদ্ধান্ত দিলে অবস্থা নিজে থেকে বদলাবে।</div>
         }
-
-        <!-- APPROVAL PROGRESS -->
         @if (c()!['status'] === 'SUBMITTED' || c()!['status'] === 'UNDER_APPROVAL' || c()!['status'] === 'APPROVED' || c()!['status'] === 'REJECTED' || isRejected()) {
           <div class="approval-card">
             <div class="approval-header">
-              <h3>অনুমোদনের অগ্রগতি</h3>
+              <h3>মেয়র / পৌর প্রশাসকের অনুমোদন</h3>
               @if (approvalDetail()) {
-                <span [class]="'st st-' + approvalDetail()!.status">
-                  {{ bn(approvalDetail()!.status) }}
-                </span>
+                <span [class]="'st st-' + approvalDetail()!.status">{{ bn(approvalDetail()!.status) }}</span>
               }
             </div>
             <div class="approval-body">
@@ -383,25 +124,21 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
               } @else {
                 @if (approvalDetail(); as d) {
                   <div class="approval-summary-top">
-                    <div><strong>ধাপ {{ approvedCount() }} / {{ d.totalSteps }} সম্পন্ন</strong></div>
-                    @if (isRejected()) {
-                      <span class="badge badge-danger">প্রত্যাখ্যাত</span>
-                    } @else if (approvedCount() === d.totalSteps) {
-                      <span class="badge badge-success">সম্পূর্ণ অনুমোদিত</span>
-                    } @else if (approvedCount() === 0) {
-                      <span class="badge badge-muted">অনুমোদন শুরু হয়নি</span>
-                    } @else {
-                      <span class="badge badge-primary">{{ approvedCount() }} ধাপ সম্পন্ন</span>
-                    }
+                    <div><strong>
+                      @if (isRejected()) { মেয়র প্রত্যাখ্যান করেছেন }
+                      @else if (approvedCount() === d.totalSteps) { মেয়র অনুমোদন করেছেন }
+                      @else { মেয়র / পৌর প্রশাসকের অনুমোদনের অপেক্ষায় }
+                    </strong></div>
+                    @if (isRejected()) { <span class="badge badge-danger">প্রত্যাখ্যাত</span> }
+                    @else if (approvedCount() === d.totalSteps) { <span class="badge badge-success">সম্পূর্ণ অনুমোদিত</span> }
+                    @else { <span class="badge badge-primary">অনুমোদনের অপেক্ষায়</span> }
                   </div>
                   <div class="progress-bar"><div class="progress-fill" [class.done]="approvedCount() === d.totalSteps && !isRejected()" [class.rejected]="isRejected()" [style.width.%]="progressPercent()"></div></div>
                   <div class="muted" style="font-size:13px; margin-bottom:16px">
-                    @if (isRejected()) { ধাপ {{ rejectedStep()!.stepNo }} এ প্রত্যাখ্যাত — পরের ধাপগুলো বাতিল }
-                    @else if (approvedCount() === d.totalSteps) { সকল ধাপ অনুমোদিত }
-                    @else if (approvedCount() === 0) { প্রথম ধাপের অপেক্ষায় }
-                    @else { ধাপ {{ approvedCount() }} অনুমোদিত — ধাপ {{ approvedCount() + 1 }} চলমান }
+                    @if (isRejected()) { মেয়র প্রত্যাখ্যান করেছেন — কমিটি গঠন হয়নি }
+                    @else if (approvedCount() === d.totalSteps) { কমিটি গঠন অনুমোদিত }
+                    @else { মেয়রের কাছে অনুমোদনের জন্য আছে }
                   </div>
-
                   @for (s of d.steps; track s.stepNo) {
                     <div class="timeline-item"
                       [class.approved]="displayStatus(s) === 'APPROVED'"
@@ -412,37 +149,23 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
                       <div class="timeline-dot"></div>
                       <div class="timeline-content">
                         <div class="step-head">
-                          <div>
-                            <strong>ধাপ {{ s.stepNo }}: {{ stepDesignationName(s) }}</strong>
-                          </div>
+                          <div><strong>মেয়র / পৌর প্রশাসকের অনুমোদন</strong></div>
                           @if (displayStatus(s) === 'APPROVED') { <span class="badge badge-success">অনুমোদিত</span> }
                           @else if (displayStatus(s) === 'REJECTED') { <span class="badge badge-danger">প্রত্যাখ্যাত</span> }
                           @else if (displayStatus(s) === 'CANCELLED') { <span class="badge badge-muted">বাতিল</span> }
                           @else if (s.isCurrentStep && !isRejected()) { <span class="badge badge-primary">বর্তমান ধাপ</span> }
                           @else { <span class="badge badge-muted">অপেক্ষায়</span> }
                         </div>
-
                         @if (displayStatus(s) === 'APPROVED') {
-                          <div class="decision-meta">
-                            <span><b>সিদ্ধান্ত দিয়েছেন:</b> {{ decidedByName(s) }}</span>
-                            <span><b>তারিখ:</b> {{ fmt(s.decidedAt) }}</span>
-                          </div>
+                          <div class="decision-meta"><span><b>সিদ্ধান্ত দিয়েছেন:</b> {{ decidedByName(s) }}</span><span><b>তারিখ:</b> {{ fmt(s.decidedAt) }}</span></div>
                           @if (s.comment) { <div class="comment-box">{{ s.comment }}</div> }
                         } @else if (displayStatus(s) === 'REJECTED') {
-                          <div class="decision-meta">
-                            <span><b>সিদ্ধান্ত দিয়েছেন:</b> {{ decidedByName(s) }}</span>
-                            <span><b>তারিখ:</b> {{ fmt(s.decidedAt) }}</span>
-                          </div>
+                          <div class="decision-meta"><span><b>সিদ্ধান্ত দিয়েছেন:</b> {{ decidedByName(s) }}</span><span><b>তারিখ:</b> {{ fmt(s.decidedAt) }}</span></div>
                           @if (s.comment) { <div class="comment-box">{{ s.comment }}</div> }
                         } @else if (displayStatus(s) === 'CANCELLED') {
-                          <div class="decision-meta">
-                            <span>আগের ধাপ প্রত্যাখ্যাত হওয়ায় এই ধাপ বাতিল হয়ে গেছে।</span>
-                          </div>
+                          <div class="decision-meta"><span>আগের ধাপ প্রত্যাখ্যাত হওয়ায় এই ধাপ বাতিল হয়ে গেছে।</span></div>
                         } @else {
-                          <div class="decision-meta">
-                            <span>অনুমোদনের অপেক্ষায়</span>
-                            @if (s.isCurrentStep) { <span>এই ধাপের অনুমোদকের কাছে এখন আছে</span> }
-                          </div>
+                          <div class="decision-meta"><span>অনুমোদনের অপেক্ষায়</span>@if (s.isCurrentStep) { <span>এই ধাপের অনুমোদকের কাছে এখন আছে</span> }</div>
                         }
                       </div>
                     </div>
@@ -454,455 +177,60 @@ type Tab = 'summary' | 'members' | 'resolution' | 'details';
             </div>
           </div>
         }
-
-        <!-- TABS -->
         <div class="tabs-row">
-
-          <button
-            class="tab-btn"
-            [class.active]="tab() === 'summary'"
-            (click)="tab.set('summary')"
-          >
-            সংক্ষেপ
-          </button>
-
-          <button
-            class="tab-btn"
-            [class.active]="tab() === 'members'"
-            (click)="tab.set('members')"
-          >
-            সদস্য ({{ members().length }})
-          </button>
-
-          <button
-            class="tab-btn"
-            [class.active]="tab() === 'resolution'"
-            (click)="openResolution()"
-          >
-            প্রস্তাব ও নথি
-          </button>
-
-          <button
-            class="tab-btn"
-            [class.active]="tab() === 'details'"
-            (click)="tab.set('details')"
-          >
-            সম্পূর্ণ তথ্য
-          </button>
-
+          <button class="tab-btn" [class.active]="tab() === 'summary'" (click)="tab.set('summary')">সংক্ষেপ</button>
+          <button class="tab-btn" [class.active]="tab() === 'members'" (click)="tab.set('members')">সদস্য ({{ members().length }})</button>
+          <button class="tab-btn" [class.active]="tab() === 'resolution'" (click)="openResolution()">প্রস্তাব ও নথি</button>
+          <button class="tab-btn" [class.active]="tab() === 'details'" (click)="tab.set('details')">সম্পূর্ণ তথ্য</button>
         </div>
-
         @switch (tab()) {
-
           @case ('summary') {
-
-            <div class="info-card">
-
-              <div class="info-card-header">
-                <h3>কমিটির সংক্ষিপ্ত তথ্য</h3>
-              </div>
-
-              <div class="info-card-body">
-
-                <div class="info-grid">
-
-                  @for (item of summaryRows(); track item.label) {
-
-                    <div class="info-item">
-
-                      <span class="info-label">
-                        {{ item.label }}
-                      </span>
-
-                      <span class="info-value">
-
-                        @if (item.isStatus) {
-                          <span [class]="'st st-' + item.status">
-                            {{ item.value }}
-                          </span>
-                        } @else {
-                          {{ item.value }}
-                        }
-
-                      </span>
-
-                    </div>
-
-                  }
-
-                </div>
-
-              </div>
-
-            </div>
-
-            @if (fieldRows().length) {
-
-              <div class="card" style="margin-top:20px">
-
-                <div class="card-header">
-                  <h3>বাড়তি তথ্য</h3>
-                </div>
-
-                <div class="card-body">
-
-                  <dl class="kv">
-
-                    @for (f of fieldRows(); track f[0]) {
-                      <dt>{{ f[0] }}</dt>
-                      <dd>{{ f[1] }}</dd>
-                    }
-
-                  </dl>
-
-                </div>
-
-              </div>
-
-            }
-
-          }
-
-          @case ('members') {
-
-            <div class="card">
-
-              <div class="card-body table-wrapper">
-
-                <table class="data-table">
-
-                  <thead>
-                    <tr>
-                      <th>নাম</th>
-                      <th>পদবী</th>
-                      <th>মোবাইল</th>
-                      <th>অবস্থা</th>
-                      <th>কার্যকরের তারিখ</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-
-                    @for (m of members(); track $index) {
-
-                      <tr>
-
-                        <td>{{ memberName(m) }}</td>
-
-                        <td>{{ desigOf(m) }}</td>
-
-                        <td>{{ memberMobile(m) }}</td>
-
-                        <td>
-                          @if (m['status']) {
-                            <span [class]="'st st-' + m['status']">
-                              {{ bn(m['status']) }}
-                            </span>
-                          } @else {
-                            —
-                          }
-                        </td>
-
-                        <td>
-                          {{
-                            fmt(
-                              pick(
-                                m,
-                                'effectiveFrom',
-                                'joinedAt',
-                                'startDate'
-                              )
-                            )
-                          }}
-                        </td>
-
-                      </tr>
-
-                    } @empty {
-
-                      <tr>
-                        <td colspan="5" class="empty">
-                          এই কমিটির তথ্যে সদস্যের তালিকা পাওয়া যায়নি।
-                        </td>
-                      </tr>
-
-                    }
-
-                  </tbody>
-
-                </table>
-
-                <p class="muted" style="margin-top:10px">
-                  সদস্য যোগ / ফেরত / প্রত্যাখ্যানের জন্য আলাদা API
-                  এখনো নেই, তাই সেই বোতামও এখানে নেই।
-                </p>
-
-              </div>
-            </div>
-
-          }
-
-          @case ('resolution') {
-
-            <div class="card">
-
-              <div class="card-body">
-
-                <dl class="kv">
-
-                  <dt>প্রস্তাব নম্বর</dt>
-
-                  <dd>
-                    {{
-                      pick(
-                        resolution(),
-                        'number',
-                        'proposalNumber',
-                        'resolutionNumber'
-                      ) || '—'
-                    }}
-                  </dd>
-
-                  <dt>প্রস্তাবের তারিখ</dt>
-
-                  <dd>
-                    {{
-                      fmt(
-                        resolution()['date'] ?? submittedAt()
-                      )
-                    }}
-                  </dd>
-
-                  <dt>নথি</dt>
-
-                  <dd>
-
-                    @if (docId()) {
-
-                      @if (doc(); as d) {
-
-                        <strong>{{ docName(d) }}</strong>
-
-                        <span [class]="'st st-' + docStatus(d)">
-                          {{ docStatusLabel(d) }}
-                        </span>
-
-                        @if (docUrl(); as u) {
-
-                          <a
-                            [href]="u"
-                            target="_blank"
-                            rel="noopener"
-                            class="chip"
-                          >
-                            খুলুন
-                          </a>
-
-                        }
-
-                      } @else {
-
-                        {{ docId() }}
-
-                        @if (docLoading()) {
-                          <span class="muted">
-                            নথির তথ্য লোড হচ্ছে...
-                          </span>
-                        }
-
-                        @if (docError()) {
-                          <span class="muted">
-                            {{ docError() }}
-                          </span>
-                        }
-
-                      }
-
-                    } @else {
-
-                      সংযুক্ত নথি নেই
-
-                    }
-
-                  </dd>
-
-                </dl>
-
-              </div>
-            </div>
-
-          }
-
-          @case ('details') {
-
-            <div class="complete-info">
-
-              <div class="info-card">
-
-                <div class="info-card-header">
-                  <h3>কমিটির সম্পূর্ণ তথ্য</h3>
-                </div>
-
-                <div class="info-card-body">
-
-                  <div class="info-grid">
-
-                    <div class="info-item">
-                      <span class="info-label">
-                        কমিটির নাম
-                      </span>
-
-                      <span class="info-value">
-                        {{ committeeNameBn() }}
-                      </span>
-                    </div>
-
-                    <div class="info-item">
-                      <span class="info-label">
-                        কমিটির নাম (ইংরেজি)
-                      </span>
-
-                      <span class="info-value">
-                        {{ committeeNameEn() }}
-                      </span>
-                    </div>
-
-                    <div class="info-item">
-                      <span class="info-label">
-                        কমিটি কোড
-                      </span>
-
-                      <span class="info-value">
-                        {{ c()?.['code'] || '—' }}
-                      </span>
-                    </div>
-
-                    <div class="info-item">
-                      <span class="info-label">
-                        কমিটির অবস্থা
-                      </span>
-
-                      <span class="info-value">
-                        <span [class]="'st st-' + effectiveStatus()">
-                          {{ bn(effectiveStatus()) }}
-                        </span>
-                      </span>
-                    </div>
-
-                    <div class="info-item">
-                      <span class="info-label">
-                        মেয়াদ শুরু
-                      </span>
-
-                      <span class="info-value">
-                        {{ fmt(c()?.['termStart']) }}
-                      </span>
-                    </div>
-
-                    <div class="info-item">
-                      <span class="info-label">
-                        মেয়াদ শেষ
-                      </span>
-
-                      <span class="info-value">
-                        {{ fmt(c()?.['termEnd']) }}
-                      </span>
-                    </div>
-
-                    <div class="info-item">
-                      <span class="info-label">
-                        সদস্য সংখ্যা
-                      </span>
-
-                      <span class="info-value">
-                        <span class="info-count">
-                          {{ members().length }}
-                        </span>
-                      </span>
-                    </div>
-
-                    <div class="info-item">
-                      <span class="info-label">
-                        সংযুক্ত নথির সংখ্যা
-                      </span>
-
-                      <span class="info-value">
-                        <span class="info-count">
-                          {{ documents().length }}
-                        </span>
-                      </span>
-                    </div>
-
-                    <div class="info-item">
-                      <span class="info-label">
-                        দাখিলের তারিখ
-                      </span>
-
-                      <span class="info-value">
-                        {{ fmt(submittedAt()) }}
-                      </span>
-                    </div>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-              @if (fieldRows().length) {
-
-                <div class="info-card">
-
-                  <div class="info-card-header">
-                    <h3>বাড়তি তথ্য</h3>
-                  </div>
-
-                  <div class="info-card-body">
-
-                    <div class="info-extra">
-
-                      @for (f of fieldRows(); track f[0]) {
-
-                        <div class="info-item">
-
-                          <span class="info-label">
-                            {{ f[0] }}
-                          </span>
-
-                          <span class="info-value">
-                            {{ f[1] }}
-                          </span>
-
-                        </div>
-
-                      }
-
-                    </div>
-
-                  </div>
-
-                </div>
-
+            <div class="info-card"><div class="info-card-header"><h3>কমিটির সংক্ষিপ্ত তথ্য</h3></div><div class="info-card-body"><div class="info-grid">
+              @for (item of summaryRows(); track item.label) {
+                <div class="info-item"><span class="info-label">{{ item.label }}</span><span class="info-value">@if (item.isStatus) { <span [class]="'st st-' + item.status">{{ item.value }}</span> } @else { {{ item.value }} }</span></div>
               }
-
-            </div>
-
+            </div></div></div>
+            @if (fieldRows().length) {
+              <div class="card" style="margin-top:20px"><div class="card-header"><h3>বাড়তি তথ্য</h3></div><div class="card-body"><dl class="kv">@for (f of fieldRows(); track f[0]) { <dt>{{ f[0] }}</dt><dd>{{ f[1] }}</dd> }</dl></div></div>
+            }
           }
-
+          @case ('members') {
+            <div class="card"><div class="card-body table-wrapper"><table class="data-table"><thead><tr><th>নাম</th><th>পদবী</th><th>মোবাইল</th><th>অবস্থা</th><th>কার্যকরের তারিখ</th></tr></thead><tbody>
+              @for (m of members(); track $index) {
+                <tr><td>{{ memberName(m) }}</td><td>{{ desigOf(m) }}</td><td>{{ memberMobile(m) }}</td><td>@if (m['status']) { <span [class]="'st st-' + m['status']">{{ bn(m['status']) }}</span> } @else { — }</td><td>{{ fmt(pick(m, 'effectiveFrom', 'joinedAt', 'startDate')) }}</td></tr>
+              } @empty { <tr><td colspan="5" class="empty">এই কমিটির তথ্যে সদস্যের তালিকা পাওয়া যায়নি।</td></tr> }
+            </tbody></table><p class="muted" style="margin-top:10px">সদস্য যোগ / ফেরত / প্রত্যাখ্যানের জন্য আলাদা API এখনো নেই, তাই সেই বোতামও এখানে নেই।</p></div></div>
+          }
+          @case ('resolution') {
+            <div class="card"><div class="card-body"><dl class="kv"><dt>প্রস্তাব নম্বর</dt><dd>{{ pick(resolution(), 'number', 'proposalNumber', 'resolutionNumber') || '—' }}</dd><dt>প্রস্তাবের তারিখ</dt><dd>{{ fmt(resolution()['date'] ?? submittedAt()) }}</dd><dt>নথি</dt><dd>@if (docId()) { @if (doc(); as d) { <strong>{{ docName(d) }}</strong><span [class]="'st st-' + docStatus(d)">{{ docStatusLabel(d) }}</span>@if (docUrl(); as u) { <a [href]="u" target="_blank" rel="noopener" class="chip">খুলুন</a> } } @else { {{ docId() }} @if (docLoading()) { <span class="muted">নথির তথ্য লোড হচ্ছে...</span> } @if (docError()) { <span class="muted">{{ docError() }}</span> } } } @else { সংযুক্ত নথি নেই }</dd></dl></div></div>
+          }
+          @case ('details') {
+            <div class="complete-info">
+              <div class="info-card"><div class="info-card-header"><h3>কমিটির সম্পূর্ণ তথ্য</h3></div><div class="info-card-body"><div class="info-grid">
+                <div class="info-item"><span class="info-label">কমিটির নাম</span><span class="info-value">{{ committeeNameBn() }}</span></div>
+                <div class="info-item"><span class="info-label">কমিটির নাম (ইংরেজি)</span><span class="info-value">{{ committeeNameEn() }}</span></div>
+                <div class="info-item"><span class="info-label">কমিটি কোড</span><span class="info-value">{{ c()?.['code'] || '—' }}</span></div>
+                <div class="info-item"><span class="info-label">কমিটির অবস্থা</span><span class="info-value"><span [class]="'st st-' + effectiveStatus()">{{ bn(effectiveStatus()) }}</span></span></div>
+                <div class="info-item"><span class="info-label">মেয়াদ শুরু</span><span class="info-value">{{ fmt(c()?.['termStart']) }}</span></div>
+                <div class="info-item"><span class="info-label">মেয়াদ শেষ</span><span class="info-value">{{ fmt(c()?.['termEnd']) }}</span></div>
+                <div class="info-item"><span class="info-label">সদস্য সংখ্যা</span><span class="info-value"><span class="info-count">{{ members().length }}</span></span></div>
+                <div class="info-item"><span class="info-label">সংযুক্ত নথির সংখ্যা</span><span class="info-value"><span class="info-count">{{ documents().length }}</span></span></div>
+                <div class="info-item"><span class="info-label">দাখিলের তারিখ</span><span class="info-value">{{ fmt(submittedAt()) }}</span></div>
+              </div></div></div>
+              @if (fieldRows().length) {
+                <div class="info-card"><div class="info-card-header"><h3>বাড়তি তথ্য</h3></div><div class="info-card-body"><div class="info-extra">@for (f of fieldRows(); track f[0]) { <div class="info-item"><span class="info-label">{{ f[0] }}</span><span class="info-value">{{ f[1] }}</span></div> }</div></div></div>
+              }
+            </div>
+          }
         }
-
       }
-
     </div>
   `
 })
-
 export class CommitteeDetailComponent implements OnInit {
-
   private route = inject(ActivatedRoute);
   private api = inject(EngineApiService);
   private cfg = inject(ConfigService);
-
   c = signal<Row | null>(null);
   doc = signal<Row | null>(null);
   desigMap = signal<Record<string, string>>({});
@@ -912,344 +240,89 @@ export class CommitteeDetailComponent implements OnInit {
   docLoading = signal(false);
   docError = signal('');
   err = signal('');
-
   approvalDetail = signal<any | null>(null);
   approvalLoading = signal(false);
   approvalError = signal('');
-
-  approvedCount = computed(() =>
-    (this.approvalDetail()?.steps ?? []).filter((s: any) => this.norm(s.decision) === 'APPROVED').length
-  );
-
-  // ★ Reject ধাপ — কোনো ধাপ REJECTED হলেই পুরা approval REJECTED
-  rejectedStep = computed(() =>
-    (this.approvalDetail()?.steps ?? []).find((s: any) => this.norm(s.decision) === 'REJECTED') ?? null
-  );
-
-  isRejected = computed(() =>
-    !!this.rejectedStep() || String(this.c()?.['status'] ?? '').toUpperCase() === 'REJECTED'
-  );
-
-  // ★ Committee-র আসল অবস্থা — Backend এ status পুরনো থাকলেও approval Reject হলে REJECTED দেখাবে
-  effectiveStatus = computed(() => {
-    if (this.isRejected()) return 'REJECTED';
-    return String(this.c()?.['status'] ?? '');
-  });
-
-  // ★ Progress % — Reject হলে Approved যতটুকু ততটুকুই, বাকিটা লাল
-  progressPercent = computed(() => {
-    const d = this.approvalDetail();
-    const total = Number(d?.totalSteps ?? d?.steps?.length ?? 0);
-    if (!total) return 0;
-    return (this.approvedCount() / total) * 100;
-  });
-
+  approvedCount = computed(() => (this.approvalDetail()?.steps ?? []).filter((s: any) => this.norm(s.decision) === 'APPROVED').length);
+  rejectedStep = computed(() => (this.approvalDetail()?.steps ?? []).find((s: any) => this.norm(s.decision) === 'REJECTED') ?? null);
+  isRejected = computed(() => !!this.rejectedStep() || String(this.c()?.['status'] ?? '').toUpperCase() === 'REJECTED');
+  effectiveStatus = computed(() => { if (this.isRejected()) return 'REJECTED'; return String(this.c()?.['status'] ?? ''); });
+  progressPercent = computed(() => { const d = this.approvalDetail(); const total = Number(d?.totalSteps ?? d?.steps?.length ?? 0); if (!total) return 0; return (this.approvedCount() / total) * 100; });
   pick = pick;
   fmt = (v: any) => fmtDate(v);
   mask = maskMobile;
-  bn = (s: string) => {
-    const k = String(s ?? '').toUpperCase();
-    if (k === 'CANCELLED') return 'বাতিল';
-    return STATUS_BN[s] ?? STATUS_BN[k] ?? s;
-  };
-
-  body = computed<Row>(() =>
-    this.c()?.['payload'] ?? this.c() ?? {}
-  );
-
-  title = computed(() =>
-    this.c()
-      ? committeeName(this.c()!)
-      : 'কমিটি'
-  );
-
-  committeeNameBn = computed(() =>
-    pick(
-      this.c(),
-      'nameBn',
-      'name',
-      'committeeName'
-    ) ?? '—'
-  );
-
-  committeeNameEn = computed(() =>
-    pick(
-      this.c(),
-      'nameEn',
-      'nameEnglish'
-    ) ?? '—'
-  );
-
-  members = computed<Row[]>(() =>
-    this.c()?.['members'] ??
-    this.body()['members'] ??
-    []
-  );
-
-  resolution = computed<Row>(() =>
-    this.c()?.['resolution'] ??
-    this.body()['resolution'] ??
-    {}
-  );
-
-  documents = computed<Row[]>(() =>
-    this.c()?.['documents'] ??
-    this.body()['documents'] ??
-    []
-  );
-
+  bn = (s: string) => { const k = String(s ?? '').toUpperCase(); if (k === 'CANCELLED') return 'বাতিল'; return STATUS_BN[s] ?? STATUS_BN[k] ?? s; };
+  body = computed<Row>(() => this.c()?.['payload'] ?? this.c() ?? {});
+  title = computed(() => this.c() ? committeeName(this.c()!) : 'কমিটি');
+  committeeNameBn = computed(() => pick(this.c(), 'nameBn', 'name', 'committeeName') ?? '—');
+  committeeNameEn = computed(() => pick(this.c(), 'nameEn', 'nameEnglish') ?? '—');
+  members = computed<Row[]>(() => this.c()?.['members'] ?? this.body()['members'] ?? []);
+  resolution = computed<Row>(() => this.c()?.['resolution'] ?? this.body()['resolution'] ?? {});
+  documents = computed<Row[]>(() => this.c()?.['documents'] ?? this.body()['documents'] ?? []);
   summaryRows = computed(() => {
-
     const committee = this.c();
-
-    if (!committee) {
-      return [];
-    }
-
+    if (!committee) return [];
     const status = this.effectiveStatus();
-
     return [
-
-      {
-        label: 'কমিটি কোড',
-        value: committee['code'] || '—'
-      },
-
-      {
-        label: 'নাম (বাংলা)',
-        value: this.committeeNameBn()
-      },
-
-      {
-        label: 'Name (English)',
-        value: this.committeeNameEn()
-      },
-
-      {
-        label: 'অবস্থা',
-        value: this.bn(status),
-        isStatus: true,
-        status
-      },
-
-      {
-        label: 'মেয়াদ শুরু',
-        value: this.fmt(committee['termStart'])
-      },
-
-      {
-        label: 'মেয়াদ শেষ',
-        value: this.fmt(committee['termEnd'])
-      },
-
-      {
-        label: 'সদস্য সংখ্যা',
-        value: String(this.members().length)
-      },
-
-      {
-        label: 'সংযুক্ত নথির সংখ্যা',
-        value: String(this.documents().length)
-      }
-
+      { label: 'কমিটি কোড', value: committee['code'] || '—' },
+      { label: 'নাম (বাংলা)', value: this.committeeNameBn() },
+      { label: 'Name (English)', value: this.committeeNameEn() },
+      { label: 'অবস্থা', value: this.bn(status), isStatus: true, status },
+      { label: 'মেয়াদ শুরু', value: this.fmt(committee['termStart']) },
+      { label: 'মেয়াদ শেষ', value: this.fmt(committee['termEnd']) },
+      { label: 'সদস্য সংখ্যা', value: String(this.members().length) },
+      { label: 'সংযুক্ত নথির সংখ্যা', value: String(this.documents().length) }
     ];
-
   });
-
   docId = computed<string>(() => {
-
     const resolution = this.resolution();
-
-    const proposal = this.documents().find(d =>
-      (d['documentRole'] ?? d['role']) === 'PROPOSAL'
-    );
-
-    return String(
-      resolution['documentId'] ??
-      this.c()?.['resolutionDocumentId'] ??
-      proposal?.['documentId'] ??
-      ''
-    );
-
+    const proposal = this.documents().find(d => (d['documentRole'] ?? d['role']) === 'PROPOSAL');
+    return String(resolution['documentId'] ?? this.c()?.['resolutionDocumentId'] ?? proposal?.['documentId'] ?? '');
   });
-
   submittedAt = computed(() => {
-
     const history = this.c()?.['statusHistory'] ?? [];
-
-    const submitted = history.find(
-      (h: Row) => h['toStatus'] === 'SUBMITTED'
-    );
-
+    const submitted = history.find((h: Row) => h['toStatus'] === 'SUBMITTED');
     return submitted?.['createdAt'] ?? null;
-
   });
-
-  fieldRows = computed(() =>
-
-    Object.entries(
-      this.body()['fields'] ??
-      this.c()?.['fields'] ??
-      {}
-    ).map(([k, v]) => [
-      k,
-      String(v)
-    ])
-
-  );
-
-  rejectReason = computed(() =>
-    pick(
-      this.c(),
-      'rejectReason',
-      'rejectionReason',
-      'comment'
-    ) ?? this.rejectedStep()?.comment ?? ''
-  );
-
-  docUrl = computed(() =>
-    pick(
-      this.doc(),
-      'url',
-      'downloadUrl',
-      'fileUrl'
-    )
-  );
-
-  docName(d: Row): string {
-
-    return (
-      pick(
-        d,
-        'originalName',
-        'fileName',
-        'originalFilename',
-        'name'
-      ) ?? '—'
-    );
-
-  }
-
-  docStatus(d: Row): string {
-
-    return String(
-      d['scanStatus'] ??
-      d['status'] ??
-      ''
-    );
-
-  }
-
+  fieldRows = computed(() => Object.entries(this.body()['fields'] ?? this.c()?.['fields'] ?? {}).map(([k, v]) => [k, String(v)]));
+  rejectReason = computed(() => pick(this.c(), 'rejectReason', 'rejectionReason', 'comment') ?? this.rejectedStep()?.comment ?? '');
+  docUrl = computed(() => pick(this.doc(), 'url', 'downloadUrl', 'fileUrl'));
+  docName(d: Row): string { return (pick(d, 'originalName', 'fileName', 'originalFilename', 'name') ?? '—'); }
+  docStatus(d: Row): string { return String(d['scanStatus'] ?? d['status'] ?? ''); }
   docStatusLabel(d: Row): string {
-
     const status = this.docStatus(d);
-
-    if (status === 'CLEAN') {
-      return 'নিরাপদ (CLEAN)';
-    }
-
-    if (status === 'INFECTED') {
-      return 'ঝুঁকিপূর্ণ (INFECTED)';
-    }
-
-    if (status === 'PENDING') {
-      return 'পরীক্ষাধীন (PENDING)';
-    }
-
+    if (status === 'CLEAN') return 'নিরাপদ (CLEAN)';
+    if (status === 'INFECTED') return 'ঝুঁকিপূর্ণ (INFECTED)';
+    if (status === 'PENDING') return 'পরীক্ষাধীন (PENDING)';
     return this.bn(status) || 'অজানা';
-
   }
-
-  memberName(m: Row): string {
-
-    return (
-      pick(
-        m,
-        'name',
-        'nameBn',
-        'memberName',
-        'userName'
-      ) ??
-
-      pick(
-        m['dynamicValues'],
-        '_memberName'
-      ) ??
-
-      '—'
-    );
-
-  }
-
+  memberName(m: Row): string { return (pick(m, 'name', 'nameBn', 'memberName', 'userName') ?? pick(m['dynamicValues'], '_memberName') ?? '—'); }
   memberMobile(m: Row): string {
-
-    const mobile =
-      pick(
-        m,
-        'mobile',
-        'mobileNo',
-        'phone'
-      ) ??
-
-      pick(
-        m['dynamicValues'],
-        '_memberMobile'
-      );
-
-    return mobile
-      ? maskMobile(mobile)
-      : '—';
-
+    const mobile = pick(m, 'mobile', 'mobileNo', 'phone') ?? pick(m['dynamicValues'], '_memberMobile');
+    return mobile ? maskMobile(mobile) : '—';
   }
-
   desigOf(m: Row): string {
-    // ★ Member এর designationName এ UUID থাকলে Map থেকে নাম নেবে
     const rawName = pick(m, 'designationName', 'designationNameBn');
     if (rawName && !this.isUuid(rawName)) return String(rawName);
-    if (rawName && this.isUuid(rawName)) {
-      const fromMap = this.desigMap()[String(rawName)];
-      if (fromMap) return fromMap;
-    }
+    if (rawName && this.isUuid(rawName)) { const fromMap = this.desigMap()[String(rawName)]; if (fromMap) return fromMap; }
     return this.desigMap()[String(m['designationId'])] ?? '—';
   }
-
-  // ★ Decision normalize — APPROVED / REJECTED / PENDING / CANCELLED
-  norm(v: any): string {
-    return String(v ?? '').trim().toUpperCase();
-  }
-
-  // ★ UUID কিনা চেনা
-  isUuid(v: any): boolean {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v ?? '').trim());
-  }
-
-  // ★ ধাপের পদবীর নাম — Backend ID পাঠালেও desigMap থেকে নাম
+  norm(v: any): string { return String(v ?? '').trim().toUpperCase(); }
+  isUuid(v: any): boolean { return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v ?? '').trim()); }
   stepDesignationName(s: any): string {
-    const raw = s?.designationName ?? s?.designationId ?? s?.designation ?? '';
-    if (raw && !this.isUuid(raw)) return String(raw);
-    const fromMap = this.desigMap()[String(raw)] ?? this.desigMap()[String(s?.designationId)];
-    if (fromMap) return fromMap;
-    return '—';
+    return 'মেয়র / পৌর প্রশাসক';
   }
-
-  // ★ সিদ্ধান্তকারীর নাম — UUID কখনো দেখাবে না
   decidedByName(s: any): string {
     const rawName = s?.decidedByName ?? s?.decidedByUserName ?? s?.approverName ?? '';
     if (rawName && !this.isUuid(rawName)) return String(rawName);
     const id = String(s?.decidedBy ?? s?.decidedById ?? s?.approverId ?? '').trim();
     if (!id) return '—';
-    // ১. এই কমিটির Member List থেকে খোঁজা
-    const fromMember = this.members().find((m: any) =>
-      String(m['userId'] ?? m['user_id'] ?? m['id'] ?? '') === id
-    );
+    const fromMember = this.members().find((m: any) => String(m['userId'] ?? m['user_id'] ?? m['id'] ?? '') === id);
     if (fromMember) return this.memberName(fromMember);
-    // ২. User Map থেকে (Identity User Lookup থাকলে এখানে ভরবে)
     const fromUserMap = this.userNameMap()[id];
     if (fromUserMap) return fromUserMap;
     return '—';
   }
-
-  // ★ একটা ধাপের দেখানোর Status — Backend এ PENDING থাকলেও Reject এর পরের ধাপ CANCELLED
   displayStatus(s: any): string {
     const raw = this.norm(s?.decision ?? s?.status);
     if (raw === 'APPROVED' || raw === 'REJECTED' || raw === 'CANCELLED') return raw;
@@ -1257,122 +330,32 @@ export class CommitteeDetailComponent implements OnInit {
     if (rs && Number(s?.stepNo) > Number(rs.stepNo)) return 'CANCELLED';
     return 'PENDING';
   }
-
   ngOnInit(): void {
-
-    const id =
-      this.route.snapshot.paramMap.get('id') ?? '';
-
-    this.cfg
-      .listDesignations()
-      .pipe(
-        catchError(() => of([]))
-      )
-      .subscribe((l: any[]) => {
-
-        this.desigMap.set(
-
-          Object.fromEntries(
-
-            l.map(d => [
-              String(d.id),
-              d.nameBn
-            ])
-
-          )
-
-        );
-
-      });
-
-    this.api
-      .getCommittee(id)
-      .subscribe({
-
-        next: (r: Row) => {
-
-          this.c.set(r);
-
-          this.loading.set(false);
-
-          this.loadApprovalDetail(id);
-
-        },
-
-        error: (e) => {
-
-          this.err.set(errMsg(e));
-
-          this.loading.set(false);
-
-        }
-
-      });
-
+    const id = this.route.snapshot.paramMap.get('id') ?? '';
+    this.cfg.listDesignations().pipe(catchError(() => of([]))).subscribe((l: any[]) => {
+      this.desigMap.set(Object.fromEntries(l.map(d => [String(d.id), d.nameBn])));
+    });
+    this.api.getCommittee(id).subscribe({
+      next: (r: Row) => { this.c.set(r); this.loading.set(false); this.loadApprovalDetail(id); },
+      error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); }
+    });
   }
-
   loadApprovalDetail(committeeId: string) {
     this.approvalLoading.set(true);
     this.approvalError.set('');
     this.api.getApprovalDetailByCommittee(committeeId).subscribe({
-      next: (d: any) => {
-        this.approvalDetail.set(d);
-        this.approvalLoading.set(false);
-      },
-      error: () => {
-        this.approvalError.set('');
-        this.approvalLoading.set(false);
-      }
+      next: (d: any) => { this.approvalDetail.set(d); this.approvalLoading.set(false); },
+      error: () => { this.approvalError.set(''); this.approvalLoading.set(false); }
     });
   }
-
   openResolution(): void {
-
     this.tab.set('resolution');
-
     const id = this.docId();
-
-    if (!id) {
-      return;
-    }
-
-    if (this.doc()) {
-      return;
-    }
-
-    if (this.docLoading()) {
-      return;
-    }
-
+    if (!id) return;
+    if (this.doc()) return;
+    if (this.docLoading()) return;
     this.docError.set('');
-
     this.docLoading.set(true);
-
-    this.api
-      .getDocument(id)
-      .pipe(
-        catchError((e) => {
-
-          this.docLoading.set(false);
-
-          this.docError.set(
-            errMsg(e) || 'নথির তথ্য লোড করা যায়নি।'
-          );
-
-          return of(null);
-
-        })
-      )
-      .subscribe(d => {
-
-        if (d) {
-          this.doc.set(d);
-        }
-
-        this.docLoading.set(false);
-
-      });
-
+    this.api.getDocument(id).pipe(catchError((e) => { this.docLoading.set(false); this.docError.set(errMsg(e) || 'নথির তথ্য লোড করা যায়নি।'); return of(null); })).subscribe(d => { if (d) { this.doc.set(d); } this.docLoading.set(false); });
   }
-
 }
