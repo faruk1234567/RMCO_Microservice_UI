@@ -1,8 +1,9 @@
 import { Injectable, Injector, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable, OperatorFunction, map, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from './auth.service';
+
 
 export type Row = Record<string, any>;
 
@@ -49,9 +50,27 @@ export class EngineApiService {
   submitDraft(id: string): Observable<Row> { return this.http.post(this.committeeApi(`/committees/drafts/${id}/submit`), {}).pipe(unwrap()); }
 
   // ---------------- Workflow service ----------------
-  myPending(): Observable<Row[]> { return this.http.get(this.workflowApi('/workflow/my-pending')).pipe(unwrap()); }
+    // ---------------- Workflow service ----------------
+  myPending(): Observable<Row[]> {
+    const ctx = this.authContext();
+    const headers = new HttpHeaders({
+      'X-Municipality-Id': ctx.municipalityId,
+      'X-User-Id': ctx.uploadedBy
+    });
+    const params = new HttpParams()
+      .set('municipalityId', ctx.municipalityId)
+      .set('userId', ctx.uploadedBy);
+    return this.http.get(this.workflowApi('/workflow/my-pending'), { headers, params }).pipe(unwrap());
+  }
+
   decide(requestId: string, body: { decision: 'APPROVED' | 'REJECTED'; comment?: string }): Observable<Row> {
-    return this.http.post(this.workflowApi(`/workflow/requests/${requestId}/decide`), body).pipe(unwrap());
+    const ctx = this.authContext();
+    const headers = new HttpHeaders({
+      'X-Municipality-Id': ctx.municipalityId,
+      'X-User-Id': ctx.uploadedBy
+    });
+    const params = new HttpParams().set('municipalityId', ctx.municipalityId);
+    return this.http.post(this.workflowApi(`/workflow/requests/${requestId}/decide`), body, { headers, params }).pipe(unwrap());
   }
   getApprovalDetailByCommittee(committeeId: string) {
     return this.http.get<any>(this.workflowApi(`/workflow/approvals/by-committee/${committeeId}/detail`));

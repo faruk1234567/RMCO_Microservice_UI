@@ -125,15 +125,22 @@ export const routes: Routes = [
             .then(m => m.LocalBodyAssignmentComponent),
       },
       {
-  path: 'config/approval-process',
-  loadComponent: () => import('./features/designation/approval-process.component').then(m => m.ApprovalProcessComponent)
-},
+        path: 'config/approval-process',
+        loadComponent: () => import('./features/designation/approval-process.component').then(m => m.ApprovalProcessComponent)
+      },
       {
-  path: 'config/signature-enroll',
-  loadComponent: () =>
-    import('./features/designation/signature-enroll.component')
-      .then(m => m.SignatureEnrollComponent),
-},
+        path: 'config/signature-enroll',
+        loadComponent: () =>
+          import('./features/designation/signature-enroll.component')
+            .then(m => m.SignatureEnrollComponent),
+      },
+      // ---------- ✅ নতুন: শাখা / উপ-শাখা Master - প্রস্তাবনার জন্য ----------
+      {
+        path: 'config/branch-master',
+        loadComponent: () =>
+          import('./features/branch/branch-master.component')
+            .then(m => m.BranchMasterComponent),
+      },
 
       { path: 'config/scopes', loadComponent: () => import('./features/config/scope-tree.component').then(m => m.ScopeTreeComponent) },
       { path: 'config/routes', loadComponent: () => import('./features/config/route-list.component').then(m => m.RouteListComponent) },

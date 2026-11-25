@@ -19,9 +19,8 @@ export interface FinanceHistoryRequest {
   expenseAmount?: number | null;
 }
 
-// *** ৩ নম্বর - এইটা না থাকলে টিক সেভ হবে না ***
 export interface AssessmentMethodRequest {
-  methodCode: string; // FULLY_RENTED | FULLY_OCCUPIED | PARTIAL
+  methodCode: string;
   enabled?: boolean | null;
   basisType?: string | null;
   deductMaintenance?: boolean | null;
@@ -33,7 +32,7 @@ export interface AssessmentMethodRequest {
 
 export interface CreateTaxProposalRequest {
   proposalNo: string;
-  sourceType: string; // COMMITTEE_PROPOSAL | GOVT_DIRECTIVE
+  sourceType: string;
   directiveId?: string | null;
   proposalKindId?: string | null;
   titleBn: string;
@@ -41,6 +40,10 @@ export interface CreateTaxProposalRequest {
   purposeType: string;
   purposeNote?: string;
   preparedByCommitteeId?: string | null;
+  // ---- শাখা - নতুন ----
+  departmentId?: string | null;
+  branchId?: string | null;
+  subBranchId?: string | null;
   coverageNote?: string;
   collectionArrangement?: string;
   extraCollectionCost?: number;
@@ -48,18 +51,17 @@ export interface CreateTaxProposalRequest {
   proposedEffectiveDate?: string | null;
   items?: TaxProposalItemRequest[];
   financeHistory?: FinanceHistoryRequest[];
-  // *** ৩ নম্বর - এই লাইনটা বাড়ানো হইলো ***
   assessmentMethods?: AssessmentMethodRequest[];
 }
 
 @Injectable({ providedIn: 'root' })
 export class TaxProposalService {
-  // ✅ /tax-proposal-service/tax-proposals
-  // -> Gateway -> /api/v1/tax-proposals
   private base = `${environment.taxProposalUrl}/tax-proposals`;
 
-  // ✅ Config - Proxy এর সবার উপরের Entry দিয়ে সরাসরি 8090 এ যাবে
-  // Gateway দিয়ে পাঠাইলে Identity তে চলে যাইতো
+  // ---- শাখা Base - নতুন ----
+  // BranchController Tax-Proposal-Service এ আছে, তাই একই Service URL
+  private branchBase = `${environment.taxProposalUrl}/branches`;
+
   private configBase = `/api/v1/config/master-items`;
 
   constructor(private http: HttpClient) {}
@@ -78,22 +80,18 @@ export class TaxProposalService {
     return this.http.get<any>(`${this.base}/${id}`);
   }
 
-  // *** রিপোর্টের জন্য - get() এরই আরেক নাম, যাতে getById() কাজ করে ***
   getById(id: string): Observable<any> {
     return this.get(id);
   }
 
-  // কমিটি — Committee Service থেকে, Gateway দিয়ে
   getCommittees(): Observable<any> {
     return this.http.get<any>(`${environment.committeeUrl}/committees`);
   }
 
-  // প্রস্তাবের ধরন — Config Service থেকে, মাস্টার আইটেম
   getProposalKinds(): Observable<any> {
     return this.http.get<any>(`${this.configBase}?group=PROPOSAL_KIND`);
   }
 
-  // করের ধরন — Config Service থেকে, মাস্টার আইটেম — একই জায়গা থেকে
   getTaxTypes(): Observable<any> {
     return this.http.get<any>(`${this.configBase}?group=TAX_TYPE`);
   }
@@ -129,13 +127,47 @@ export class TaxProposalService {
   listProposals() {
     return this.http.get<any>(this.base);
   }
-  listBranches() {
-  return this.http.get(`/tax-proposal-service/branches`);
+
+  // ---- শাখা - নতুন / ঠিক করা ----
+  // সব শাখা একবারে আনে, Component নিজে parentId দিয়ে Filter করবে
+  listBranches(parentId?: string | null): Observable<any> {
+    let params = new HttpParams();
+    if (parentId) params = params.set('parentId', String(parentId));
+    return this.http.get<any>(this.branchBase, { params });
+  }
+
+  // Component এ getBranches() নামে ডাকলেও যাতে চলে
+  getBranches(parentId?: string | null): Observable<any> {
+    return this.listBranches(parentId);
+  }
+
+  getBranchesByParent(parentId: string): Observable<any> {
+    return this.listBranches(parentId);
+  }
+
+  sendToCommittee(id: string) {
+  // Login User এর Designation LocalStorage থেকে নিবে
+  // আপনার Auth এ যেই Key তে Designation থাকে, ঐটা বসান
+  const userStr = localStorage.getItem('user') || localStorage.getItem('currentUser') || '{}';
+  let designation = '';
+  try { designation = JSON.parse(userStr)?.designationCode || JSON.parse(userStr)?.designation || ''; } catch {}
+  if (!designation) designation = localStorage.getItem('designationCode') || '';
+
+  // Test এর জন্য - যদি LocalStorage এ না থাকে, তাহলে BRANCH_HEAD পাঠাবে
+  // পরে আসল Designation আসলে এই লাইনটা কেটে দিবেন
+  if (!designation) designation = 'BRANCH_HEAD';
+
+  const municipalityId = localStorage.getItem('municipalityId') || '';
+
+  return this.http.post(`${this.base}/${id}/send-to-committee`, {}, {
+    headers: {
+      'X-Municipality-Id': municipalityId,
+      'X-Designation-Code': designation
+    }
+  });
 }
-sendToCommittee(id: string) {
-  return this.http.post(`/tax-proposal-service/tax-proposals/${id}/send-to-committee`, {});
-}
-committeeApprove(id: string) {
-  return this.http.post(`/tax-proposal-service/tax-proposals/${id}/committee-approve`, {});
-}
+
+  committeeApprove(id: string) {
+    return this.http.post(`${this.base}/${id}/committee-approve`, {});
+  }
 }

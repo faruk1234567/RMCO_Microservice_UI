@@ -24,6 +24,12 @@ export class TaxproposalCreateComponent implements OnInit {
   purposeTypes = signal<any[]>([]);
   assessmentOptions = signal<any[]>([]);
 
+  // ---- শাখা - নতুন ----
+  departments = signal<any[]>([]);
+  branches = signal<any[]>([]);
+  subBranches = signal<any[]>([]);
+  private allBranches: any[] = [];
+
   isGovtDirective = computed(() => this.form?.get('sourceType')?.value === 'GOVT_DIRECTIVE');
 
   constructor(
@@ -34,7 +40,7 @@ export class TaxproposalCreateComponent implements OnInit {
   ) {
     this.form = this.fb.group({
       proposalNo: ['', Validators.required],
-    sourceType: ['MUNICIPAL', Validators.required],
+      sourceType: ['MUNICIPAL', Validators.required],
       directiveId: [''],
       proposalKindId: [''],
       titleBn: ['', Validators.required],
@@ -42,6 +48,10 @@ export class TaxproposalCreateComponent implements OnInit {
       purposeType: ['', Validators.required],
       purposeNote: [''],
       preparedByCommitteeId: [''],
+      // ---- শাখা - নতুন ----
+      departmentId: ['', Validators.required],
+      branchId: ['', Validators.required],
+      subBranchId: [''],
       proposedEffectiveDate: [''],
       coverageNote: [''],
       collectionArrangement: [''],
@@ -71,6 +81,56 @@ export class TaxproposalCreateComponent implements OnInit {
     (this.service as any).getRateBases?.().subscribe({ next: (res: any) => this.rateBases.set(this.toList(res)), error: () => this.rateBases.set([]) });
     (this.service as any).getPurposeTypes?.().subscribe({ next: (res: any) => this.purposeTypes.set(this.toList(res)), error: () => this.purposeTypes.set([]) });
     (this.service as any).getAssessmentOptions?.().subscribe({ next: (res: any) => this.assessmentOptions.set(this.toList(res)), error: () => this.assessmentOptions.set([]) });
+
+    // ---- শাখা Load - নতুন ----
+    this.loadBranches();
+  }
+
+  // ---- শাখা Methods - নতুন ----
+    private loadBranches() {
+    (this.service as any).listBranches?.().subscribe({
+      next: (res: any) => {
+        this.allBranches = this.toList(res);
+        this.departments.set(this.allBranches.filter((b: any) => this.isDepartment(b)));
+      },
+      error: () => this.departments.set([])
+    });
+  }
+
+  private isDepartment(b: any): boolean {
+    const level = String(b.level ?? b.levelName ?? '').toUpperCase();
+    return level === 'DEPARTMENT' || level === 'DIVISION' || level === 'বিভাগ' || !b.parentId;
+  }
+
+  private getParentId(b: any): any {
+    return b.parentId ?? b.parent?.id ?? b.parentBranchId ?? null;
+  }
+
+  onDepartmentChange() {
+    const deptId = this.form.get('departmentId')?.value;
+    this.form.patchValue({ branchId: '', subBranchId: '' });
+    this.subBranches.set([]);
+    if (!deptId) { this.branches.set([]); return; }
+    const filtered = this.allBranches.filter((b: any) => String(this.getParentId(b)) === String(deptId));
+    if (filtered.length) { this.branches.set(filtered); return; }
+    // allBranches এ না পাইলে parentId দিয়ে আবার Load
+    (this.service as any).listBranches?.(deptId)?.subscribe({
+      next: (res: any) => this.branches.set(this.toList(res)),
+      error: () => this.branches.set([])
+    });
+  }
+
+  onBranchChange() {
+    const branchId = this.form.get('branchId')?.value;
+    this.form.patchValue({ subBranchId: '' });
+    if (!branchId) { this.subBranches.set([]); return; }
+    const filtered = this.allBranches.filter((b: any) => String(this.getParentId(b)) === String(branchId));
+    if (filtered.length) { this.subBranches.set(filtered); return; }
+    // *** এখানে ঠিক করা হইছে - deptId -> branchId ***
+    (this.service as any).listBranches?.(branchId)?.subscribe({
+      next: (res: any) => this.subBranches.set(this.toList(res)),
+      error: () => this.subBranches.set([])
+    });
   }
 
   private toList(res: any): any[] {
@@ -132,13 +192,12 @@ export class TaxproposalCreateComponent implements OnInit {
   }
 
   submit() {
-    // *** clean কে সবার আগে বানালাম, ব্যবহারের আগে ***
     const clean = (val: any) => (val === '' || val === undefined ? null : val);
     const cleanNum = (val: any) => (val === '' || val === null || val === undefined ? null : Number(val));
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.error.set('প্রস্তাব নং, শিরোনাম (বাংলা), করের হার — এগুলো লাগবেই');
+      this.error.set('প্রস্তাব নং, শিরোনাম (বাংলা), করের হার, বিভাগ + শাখা — এগুলো লাগবেই');
       return;
     }
     if (this.itemsControls.some(g => this.isOverMax(g))) {
@@ -150,23 +209,25 @@ export class TaxproposalCreateComponent implements OnInit {
       this.error.set('GOVT_DIRECTIVE হলে Directive ID লাগবে');
       return;
     }
+    // ---- শাখা Validation - নতুন ----
+    if (!v.departmentId || !v.branchId) {
+      this.error.set('বিভাগ + শাখা Select করেন');
+      return;
+    }
 
-    // *** এইটাই আসল ঠিক ***
-    // COMMITTEE_PROPOSAL হলে directive খালি রাখা যাবে না - DB চেক আটকাবে
-    // তাই directive না দিলে কমিটির ID-ই directive হবে
-   let finalSourceType = v.sourceType;
-if (finalSourceType === 'COMMITTEE_PROPOSAL') {
-  finalSourceType = 'MUNICIPAL'; // DB তে COMMITTEE_PROPOSAL নাই
-}
-let finalDirectiveId = clean(v.directiveId?.trim());
-if (v.sourceType === 'MUNICIPAL') {
-  finalDirectiveId = null;
-}
+    let finalSourceType = v.sourceType;
+    if (finalSourceType === 'COMMITTEE_PROPOSAL') {
+      finalSourceType = 'MUNICIPAL';
+    }
+    let finalDirectiveId = clean(v.directiveId?.trim());
+    if (v.sourceType === 'MUNICIPAL') {
+      finalDirectiveId = null;
+    }
     this.saving.set(true);
     this.error.set('');
     const payload: any = {
       proposalNo: v.proposalNo.trim(),
-     sourceType: finalSourceType,
+      sourceType: finalSourceType,
       directiveId: finalDirectiveId,
       proposalKindId: clean(v.proposalKindId),
       titleBn: v.titleBn.trim(),
@@ -174,6 +235,10 @@ if (v.sourceType === 'MUNICIPAL') {
       purposeType: v.purposeType,
       purposeNote: clean(v.purposeNote?.trim()),
       preparedByCommitteeId: clean(v.preparedByCommitteeId),
+      // ---- শাখা Payload - নতুন ----
+      departmentId: clean(v.departmentId),
+      branchId: clean(v.branchId),
+      subBranchId: clean(v.subBranchId),
       proposedEffectiveDate: clean(v.proposedEffectiveDate),
       coverageNote: clean(v.coverageNote?.trim()),
       collectionArrangement: clean(v.collectionArrangement?.trim()),
@@ -194,17 +259,16 @@ if (v.sourceType === 'MUNICIPAL') {
         incomeAmount: cleanNum(f.incomeAmount),
         expenseAmount: cleanNum(f.expenseAmount)
       })),
-
-assessmentMethods: (v.assessmentMethods || []).map((a: any) => ({
-  methodCode: a.buildingCategory,
-  enabled: !!a.enabled,
-  basisType: a.baseMethod,
-  deductMaintenance: !!a.maintenanceDeduction,
-  deductMortgageNonCommercial: !!a.mortgageFullDeduction,
-  deductMortgageCommercialOneThird: !!a.mortgageQuarterDeduction,
-  compareWithMarketRent: !!a.comparableRent,
-  note: clean(a.note?.trim())
-}))
+      assessmentMethods: (v.assessmentMethods || []).map((a: any) => ({
+        methodCode: a.buildingCategory,
+        enabled: !!a.enabled,
+        basisType: a.baseMethod,
+        deductMaintenance: !!a.maintenanceDeduction,
+        deductMortgageNonCommercial: !!a.mortgageFullDeduction,
+        deductMortgageCommercialOneThird: !!a.mortgageQuarterDeduction,
+        compareWithMarketRent: !!a.comparableRent,
+        note: clean(a.note?.trim())
+      }))
     };
     this.service.create(payload).subscribe({
       next: () => { this.saving.set(false); this.router.navigate(['/tax-proposals']); },

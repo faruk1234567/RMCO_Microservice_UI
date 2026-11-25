@@ -30,6 +30,26 @@
         </select>
         <small *ngIf="committees().length === 0">কোনো সক্রিয় কমিটি পাওয়া যায়নি। প্রথমে কমিটি সক্রিয় করুন।</small>
       </label>
+      <!-- শাখা - নতুন -->
+      <label>বিভাগ *
+        <select formControlName="departmentId" (change)="onDepartmentChange()">
+          <option value="">-- বিভাগ বেছে নিন --</option>
+          <option *ngFor="let d of departments()" [value]="d.id">{{ d.nameBn || d.name }}</option>
+        </select>
+        <small *ngIf="departments().length === 0">কোনো বিভাগ পাওয়া যায়নি। প্রথমে Branch Master এ বিভাগ বানান।</small>
+      </label>
+      <label>শাখা *
+        <select formControlName="branchId" (change)="onBranchChange()">
+          <option value="">-- শাখা বেছে নিন --</option>
+          <option *ngFor="let b of branches()" [value]="b.id">{{ b.nameBn || b.name }}</option>
+        </select>
+      </label>
+      <label>উপ-শাখা
+        <select formControlName="subBranchId">
+          <option value="">-- উপ-শাখা বেছে নিন --</option>
+          <option *ngFor="let s of subBranches()" [value]="s.id">{{ s.nameBn || s.name }}</option>
+        </select>
+      </label>
       <label>প্রস্তাবিত কার্যকর তারিখ<input type="date" formControlName="proposedEffectiveDate" /></label>
     </div>
 
