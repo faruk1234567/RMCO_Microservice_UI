@@ -1,0 +1,35 @@
+<!-- পপ-আপ — লগইনের পরপর আসবে -->
+<div class="citizen-popup-overlay" *ngIf="popupNotification && !showReport">
+  <div class="citizen-popup">
+    <h2>📢 নতুন কর প্রস্তাব প্রাক-প্রকাশ হয়েছে</h2>
+    <p><b>{{ popupNotification.title }}</b></p>
+    <p>{{ popupNotification.message }}</p>
+    <div class="popup-actions">
+      <button class="btn-primary" (click)="viewReport()">দেখুন</button>
+      <button class="btn-secondary" (click)="later()">পরে দেখবো</button>
+    </div>
+  </div>
+</div>
+
+<!-- দেখুন ক্লিক করলে — পুরো রিপোর্ট -->
+<div class="citizen-report-overlay" *ngIf="showReport && reportProposal">
+  <div class="citizen-report-box">
+    <div class="report-head">
+      <h2>প্রস্তাব নং {{ reportProposal.proposalNo }} — পুরো রিপোর্ট</h2>
+      <button (click)="closeReport()">✕ বন্ধ</button>
+    </div>
+
+    <!-- এখানে আপনার আগের reportTemplate এর মতোই পুরো রিপোর্ট দেখাবেন -->
+    <!-- citizen এর জন্য viewOnly = true দিবেন, যাতে স্বাক্ষর/প্রিন্ট বাটন না আসে -->
+    <p><b>শিরোনাম:</b> {{ reportProposal.titleBn || reportProposal.title }}</p>
+    <p><b>প্রস্তাবিত আদায়:</b> ৳ {{ reportProposal.totalProposed }}</p>
+    <p><b>বর্তমান আদায়:</b> ৳ {{ reportProposal.totalCurrent }}</p>
+    <p><b>আপত্তির সময়:</b> {{ reportProposal.objectionWindowMonths }} মাস</p>
+    <p><b>প্রকাশের স্থান:</b> {{ reportProposal.prePublishPlaceOrMethod }}</p>
+
+    <div class="report-actions">
+      <button class="btn-primary" (click)="markAsRead()">পড়েছি</button>
+      <button class="btn-secondary" (click)="closeReport()">পরে দেখবো</button>
+    </div>
+  </div>
+</div>

@@ -1,3 +1,5 @@
+<!-- ===== রিপোর্ট টেমপ্লেট — ১ বার লিখলাম, ২ জায়গায় দেখাবে ===== -->
+<ng-template #reportTemplate>
 <div class="report-page" *ngIf="proposal">
 
   <div class="letterhead">
@@ -77,7 +79,6 @@
   <section class="block">
     <h2><span class="no">৩</span>মূল্যায়ন পদ্ধতির প্রস্তাব — বিধি ১৮</h2>
     <p class="hint">এই প্রস্তাবে বার্ষিক মূল্য দেওয়া হয় না। শুধু কোন নিয়মে মূল্যায়ন হবে — সেই নীতির প্রস্তাব করা হইলো।</p>
-
     <div class="method" *ngFor="let v of valuations">
       <div class="method-head">
         <span class="method-title">{{ (v.methodLabel && v.methodLabel !== '—') ? v.methodLabel : 'পদ্ধতি বাছাই করা হয়নি' }}</span>
@@ -127,36 +128,89 @@
     </table>
   </section>
 
-  <!-- স্বাক্ষর -->
-  <div class="sign-area">
-    <div class="sign-note">উপরোক্ত প্রস্তাবটি সঠিক ও সত্য। কমিটির সিদ্ধান্ত অনুযায়ী অনুমোদনের জন্য উপস্থাপন করা হলো।</div>
-    <div class="sign-row">
-      <div class="sign-box">
-        <div class="sign-img-wrap">
-          <img *ngIf="secretarySign" [src]="secretarySign" [alt]="secretaryDesignation" class="sign-img" />
-          <span *ngIf="!secretarySign" class="sign-empty">স্বাক্ষর পাওয়া যায়নি</span>
+  <ng-container *ngIf="!viewOnly">
+    <div class="sign-area">
+      <div class="sign-note">উপরোক্ত প্রস্তাবটি সঠিক ও সত্য। কমিটির সিদ্ধান্ত অনুযায়ী অনুমোদনের জন্য উপস্থাপন করা হলো।</div>
+      <div class="sign-row">
+        <div class="sign-box">
+          <div class="sign-img-wrap">
+            <img *ngIf="secretarySign" [src]="secretarySign" [alt]="secretaryDesignation" class="sign-img" />
+            <span *ngIf="!secretarySign" class="sign-empty">স্বাক্ষর পাওয়া যায়নি</span>
+          </div>
+          <div class="sign-line"></div>
+          <div class="sign-name">{{ secretaryName || '—' }}</div>
+          <div class="sign-post">{{ secretaryDesignation }}</div>
+          <div class="sign-org">{{ municipalityName }}</div>
         </div>
-        <div class="sign-line"></div>
-        <div class="sign-name">{{ secretaryName || '—' }}</div>
-        <div class="sign-post">{{ secretaryDesignation }}</div>
-        <div class="sign-org">{{ municipalityName }}</div>
-      </div>
-      <div class="sign-seal"><div class="seal-circle"><span>{{ municipalityName || 'পৌরসভা' }}</span><strong>সীল</strong><small>প্রস্তাব নং {{ proposal?.proposalNo }}</small></div></div>
-      <div class="sign-box">
-        <div class="sign-img-wrap">
-          <img *ngIf="mayorSign" [src]="mayorSign" [alt]="mayorDesignation" class="sign-img" />
-          <span *ngIf="!mayorSign" class="sign-empty">স্বাক্ষর পাওয়া যায়নি</span>
+        <div class="sign-seal"><div class="seal-circle"><span>{{ municipalityName || 'পৌরসভা' }}</span><strong>সীল</strong><small>প্রস্তাব নং {{ proposal?.proposalNo }}</small></div></div>
+        <div class="sign-box">
+          <div class="sign-img-wrap">
+            <img *ngIf="mayorSign" [src]="mayorSign" [alt]="mayorDesignation" class="sign-img" />
+            <span *ngIf="!mayorSign" class="sign-empty">স্বাক্ষর পাওয়া যায়নি</span>
+          </div>
+          <div class="sign-line"></div>
+          <div class="sign-name">{{ mayorName || '—' }}</div>
+          <div class="sign-post">{{ mayorDesignation }}</div>
+          <div class="sign-org">{{ municipalityName }}</div>
         </div>
-        <div class="sign-line"></div>
-        <div class="sign-name">{{ mayorName || '—' }}</div>
-        <div class="sign-post">{{ mayorDesignation }}</div>
-        <div class="sign-org">{{ municipalityName }}</div>
       </div>
+      <div class="sign-date-row"><span>তারিখ: {{ formattedDate }}</span><span>প্রস্তাব নং: {{ proposal?.proposalNo }}</span></div>
+      <div class="print-foot">প্রিন্টের তারিখ: {{ printedOn }}</div>
     </div>
-    <div class="sign-date-row"><span>তারিখ: {{ formattedDate }}</span><span>প্রস্তাব নং: {{ proposal?.proposalNo }}</span></div>
-    <div class="print-foot">প্রিন্টের তারিখ: {{ printedOn }}</div>
-  </div>
-
-  <div class="print-row"><button class="print-btn" (click)="printReport()">🖨️ প্রিন্ট / PDF</button></div>
+    <div class="print-row"><button class="print-btn" (click)="printReport()">🖨 প্রিন্ট / PDF</button></div>
+  </ng-container>
 </div>
+</ng-template>
+
+<!-- ===== মূল পেজে রিপোর্ট দেখানো ===== -->
+<ng-container *ngTemplateOutlet="reportTemplate"></ng-container>
+
+<!-- ===== ধাপ ২: প্রাক-প্রকাশ ফর্ম — ngModel ছাড়া ===== -->
+<div class="card pre-publish-card" *ngIf="proposal?.status === 'COMMITTEE_APPROVED' && !showPreview">
+  <h2>প্রাক-প্রকাশ</h2>
+
+  <label>প্রকাশের স্থান / মাধ্যম</label>
+  <input [value]="prePublishForm.placeOrMethod"
+         (input)="prePublishForm.placeOrMethod = $any($event.target).value"
+         placeholder="Municipal Office Notice Board" />
+
+  <label>আপত্তির সময় (মাস)</label>
+  <input type="number" [value]="prePublishForm.objectionWindowMonths"
+         (input)="prePublishForm.objectionWindowMonths = +$any($event.target).value" />
+
+  <label>
+    <input type="checkbox" [checked]="prePublishForm.publicNoticeEnabled"
+           (change)="prePublishForm.publicNoticeEnabled = $any($event.target).checked" />
+    জনসাধারণের জন্য নোটিশ চালু করুন
+  </label>
+
+  <label>নোটিশের নথি (ঐচ্ছিক) — PDF / JPG / PNG, সর্বোচ্চ 5 MB</label>
+  <input type="file" (change)="onNoticeFileSelect($event)" accept=".pdf,.jpg,.jpeg,.png" />
+  <small *ngIf="noticeFileName">{{ noticeFileName }}</small>
+
+  <button class="btn-primary" (click)="openPreview()" [disabled]="!prePublishForm.placeOrMethod">
+    প্রাক-প্রকাশ করুন
+  </button>
+</div>
+
+<!-- ===== ধাপ ৩: প্রিভিউ — উপরের রিপোর্টের হুবহু কপি ===== -->
+<div class="preview-overlay" *ngIf="showPreview">
+  <div class="preview-box">
+    <div class="preview-head">
+      <h2>প্রিভিউ — নাগরিকের কাছে এটাই যাবে</h2>
+      <p>প্রকাশের স্থান: {{ prePublishForm.placeOrMethod }} | আপত্তির সময়: {{ prePublishForm.objectionWindowMonths }} মাস | নোটিশ: {{ prePublishForm.publicNoticeEnabled ? 'চালু' : 'বন্ধ' }}</p>
+      <p *ngIf="noticeFileName">নোটিশের নথি: {{ noticeFileName }}</p>
+    </div>
+
+    <div class="preview-report">
+      <ng-container *ngTemplateOutlet="reportTemplate"></ng-container>
+    </div>
+
+    <div class="preview-actions">
+      <button class="btn-primary" (click)="confirmPublish()">পাঠান / নিশ্চিত করুন</button>
+      <button class="btn-secondary" (click)="showPreview = false">বাতিল</button>
+    </div>
+  </div>
+</div>
+
 <div class="loading" *ngIf="!proposal">রিপোর্ট লোড হচ্ছে...</div>

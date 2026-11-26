@@ -1,5 +1,6 @@
-// D-02 / D-03 : অনুরোধের বিস্তারিত ও সিদ্ধান্ত (Approve / Reject) - COMPLETE - FINAL
+// D-02 / D-03 : অনুরোধের বিস্তারিত ও সিদ্ধান্ত (Approve / Reject)
 // ⚠ অনুরোধের আলাদা GET API নেই, তাই my-pending তালিকা থেকে অনুরোধটি খুঁজে দেখানো হয়
+// ★ UPDATED: sourceType অনুযায়ী COMMITTEE / PROPOSAL আলাদা হ্যান্ডেল
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -9,11 +10,12 @@ import { ConfigService } from '../../core/services/config.service';
 import { ENGINE_STYLES, Row, STATUS_BN, errMsg, fmtDate, idOf, pick } from '../committee/engine-shared';
 import { MunicipalityCacheService } from '../../core/services/municipality-cache.service';
 import { AuthService } from '../../core/services/auth.service';
+import { TaxProposalReportComponent } from '../taxproposal/tax-proposal-report.component';
 
 @Component({
   selector: 'app-workflow-decision',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, TaxProposalReportComponent],
   styles: [ENGINE_STYLES, `
     .info-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
     .info-card .card-header { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
@@ -33,6 +35,7 @@ import { AuthService } from '../../core/services/auth.service';
     .decision-option { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; color: #334155; background: #fff; }
     .decision-option:has(input:checked) { border-color: #1d4ed8; background: #eff6ff; color: #1d4ed8; }
     .decision-option.reject:has(input:checked) { border-color: #dc2626; background: #fef2f2; color: #b91c1c; }
+    .report-scroll { max-height: 65vh; overflow-y: auto; overflow-x: hidden; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
     @media (max-width: 640px) { .kv { grid-template-columns: 1fr; gap: 6px; } }
   `],
   template: `
@@ -50,19 +53,28 @@ import { AuthService } from '../../core/services/auth.service';
           <div class="card-header"><h3>অনুরোধের তথ্য</h3></div>
           <div class="card-body">
             <dl class="kv">
-              <dt>কমিটি</dt><dd>{{ committeeName() }}</dd>
+              <dt>বিষয়</dt><dd>{{ committeeName() }}</dd>
               <dt>পৌরসভা</dt><dd>{{ municipalityName() }}</dd>
               <dt>ধাপ</dt><dd>ধাপ {{ req()!['stepNo'] ?? '—' }}</dd>
               <dt>অনুমোদক</dt><dd>{{ designationName() }}</dd>
-              <dt>উৎস</dt><dd>কমিটি গঠন</dd>
+              <dt>উৎস</dt><dd>{{ sourceLabel() }}</dd>
               <dt>SLA শেষ হবে</dt><dd>{{ fmt(req()!['slaDeadline']) }}</dd>
               <dt>অবস্থা</dt><dd><span class="badge badge-primary">{{ bn(req()!['status'] ?? 'PENDING') }}</span></dd>
             </dl>
-            @if (committeeId()) {
-              <p style="margin-top:12px"><a class="btn-ghost" style="text-decoration:none" [routerLink]="['/committee', committeeId()]">কমিটির পূর্ণ বিবরণ দেখুন</a></p>
+            @if (isCommittee()) {
+              <p style="margin-top:12px"><a class="btn-ghost" style="text-decoration:none" [routerLink]="['/committee', sourceId()]">কমিটির পূর্ণ বিবরণ দেখুন</a></p>
             }
           </div>
         </div>
+        @if (isProposal()) {
+          <div class="card mb-2">
+            <div class="card-header"><h3>কর প্রস্তাবের রিপোর্ট</h3></div>
+            <div class="card-body">
+              <div class="report-scroll"><app-tax-proposal-report [proposalId]="sourceId()" [viewOnly]="true"></app-tax-proposal-report></div>
+              <p style="margin-top:8px"><a class="btn-ghost" style="text-decoration:none" [routerLink]="['/tax-proposals', sourceId(), 'report']" target="_blank">পূর্ণ পর্দায় খুলুন / প্রিন্ট করুন</a></p>
+            </div>
+          </div>
+        }
         @if (steps().length) {
           <div class="card mb-2"><div class="card-header"><h3>অনুমোদনের ধাপ</h3></div>
             <div class="card-body table-wrapper">
@@ -72,8 +84,10 @@ import { AuthService } from '../../core/services/auth.service';
                   @for (s of steps(); track $index) {
                     <tr>
                       <td>{{ pick(s, 'levelNo', 'stepNo') ?? $index + 1 }}</td>
-                      <td>{{ stepApproverName(s) }}</td>
-                      <td>@if (s['status']) { <span [class]="'st st-' + s['status']">{{ bn(s['status']) }}</span> } @else { — }</td>
+                      <td>{{ stepApproverName(s) }}
+                        @if (s['memberCount'] > 1) { <span class="muted">({{ s['approvedCount'] }}/{{ s['memberCount'] }} জন)</span> }
+                      </td>
+                      <td>@if (pick(s, 'decision', 'status'); as st) { <span [class]="'st st-' + st">{{ bn(st) }}</span> } @else { — }</td>
                       <td>{{ fmt(pick(s, 'decidedAt', 'updatedAt')) }}</td>
                       <td>{{ pick(s, 'comment', 'reason') || '—' }}</td>
                     </tr>
@@ -111,7 +125,7 @@ export class WorkflowDecisionComponent implements OnInit {
   private api = inject(EngineApiService);
   private cfg = inject(ConfigService);
   private munCache = inject(MunicipalityCacheService);
-  private auth = inject(AuthService); // ★ আগে এই লাইনটা ছিল না
+  private auth = inject(AuthService);
 
   req = signal<Row | null>(null);
   loading = signal(true); saving = signal(false);
@@ -127,11 +141,12 @@ export class WorkflowDecisionComponent implements OnInit {
 
   pick = pick; bn = (s: string) => STATUS_BN[s] ?? s; fmt = (v: any) => fmtDate(v, true);
   steps = computed<Row[]>(() => this.req()?.['steps'] ?? []);
-  committeeId = computed<string>(() => {
-    const r = this.req();
-    if (!r) return '';
-    return String(r['sourceId'] ?? r['sourceid'] ?? r['committeeId'] ?? r['refId'] ?? '');
-  });
+
+  // ★ সোর্স টাইপ: COMMITTEE হলে sourceId = committeeId, PROPOSAL হলে sourceId = proposalId
+  isProposal = computed(() => String(this.req()?.['sourceType'] ?? '').toUpperCase() === 'PROPOSAL');
+  isCommittee = computed(() => String(this.req()?.['sourceType'] ?? '').toUpperCase() === 'COMMITTEE');
+  sourceLabel = computed(() => this.isProposal() ? 'কর প্রস্তাব' : this.isCommittee() ? 'কমিটি গঠন' : 'অন্যান্য');
+  sourceId = computed<string>(() => String(this.req()?.['sourceId'] ?? ''));
 
   problem(): string {
     if (!this.decision) return 'সিদ্ধান্ত বাছাই করুন।';
@@ -140,6 +155,7 @@ export class WorkflowDecisionComponent implements OnInit {
   }
 
   stepApproverName(s: Row): string {
+    if (Number(s['memberCount'] ?? 0) > 1) return 'কমিটির সদস্যগণ';
     const direct = pick(s, 'approverName', 'approver', 'approverRef', 'designationName');
     if (direct && !String(direct).includes('-') && String(direct).length < 50) return String(direct);
     const id = String(pick(s, 'approverId', 'designationId', 'approver', 'approverRef') ?? '');
@@ -170,17 +186,21 @@ export class WorkflowDecisionComponent implements OnInit {
   }
 
   private loadNames(r: Row) {
-    const committeeId = String(r['sourceId'] ?? r['sourceid'] ?? '');
-    if (committeeId) {
-      this.api.getCommittee(committeeId).subscribe({
+    const type = String(r['sourceType'] ?? '').toUpperCase();
+    // ★ কমিটির API শুধু COMMITTEE টাইপে
+    if (type === 'COMMITTEE') {
+      const cid = String(r['sourceId'] ?? '');
+      this.api.getCommittee(cid).subscribe({
         next: (c: any) => {
           const name = pick(c, 'nameBn', 'name', 'committeeName') ?? pick(c?.['data'], 'nameBn', 'name') ?? pick(c?.['payload'], 'nameBn', 'name');
           this.committeeName.set(name ? String(name) : 'কমিটি');
         },
         error: () => this.committeeName.set('কমিটি'),
       });
+    } else if (type === 'PROPOSAL') {
+      this.committeeName.set(String(r['title'] ?? 'কর প্রস্তাব'));
     } else {
-      this.committeeName.set('কমিটি');
+      this.committeeName.set(String(r['title'] ?? '—'));
     }
     this.loadMunicipalityFromDetail();
     const approverId = String(r['approverId'] ?? r['designationId'] ?? r['approverDesignationId'] ?? r['approverRef'] ?? '');
@@ -198,52 +218,42 @@ export class WorkflowDecisionComponent implements OnInit {
     }
   }
 
-  // ★ পৌরসভার নাম - my-pending + Committee + AuthService + Cache থেকে
-  // ❌ getApprovalDetail কল হবে না (404), ❌ municipalities কল হবে না (403)
-private loadMunicipalityFromDetail() {
-  const r = this.req();
-  if (!r) return;
-
-  console.log('[Decision] loadMunicipality - ensureLoaded call করছি');
-  // ★ Cache খালি হলে আগে municipalities এনে ভরো, তারপর নাম খোঁজো
-  this.munCache.ensureLoaded().subscribe({
-    next: () => {
-      console.log('[Decision] ensureLoaded DONE, cache:', this.munCache.getName('15'));
-      this.resolveMunicipalityName();
-    },
-    error: () => this.resolveMunicipalityName(),
-  });
-}
-
-private resolveMunicipalityName() {
-  const r = this.req();
-  if (!r) return;
-  const fromRowId = this.deepFind(r, ['municipalityId', 'municipality_id']);
-  const fromRowName = this.deepFind(r, ['municipalityName', 'municipalityNameBn', 'municipalityNameEn']);
-  if (fromRowName) { this.municipalityName.set(String(fromRowName)); this.err.set(''); return; }
-  if (fromRowId) {
-    const cached = this.munCache.getName(String(fromRowId));
-    if (cached) { this.municipalityName.set(cached); this.err.set(''); return; }
+  private loadMunicipalityFromDetail() {
+    const r = this.req();
+    if (!r) return;
+    this.munCache.ensureLoaded().subscribe({
+      next: () => this.resolveMunicipalityName(),
+      error: () => this.resolveMunicipalityName(),
+    });
   }
-  const committeeId = String(r['sourceId'] ?? r['sourceid'] ?? '');
-  if (!committeeId) { this.showMunNotFound(fromRowId); return; }
-  this.api.getCommittee(committeeId).subscribe({
-    next: (c: any) => {
-      const fromComName = this.deepFind(c, ['municipalityName', 'municipalityNameBn', 'municipalityNameEn']);
-      const fromComId = this.deepFind(c, ['municipalityId', 'municipality_id']);
-      if (fromComName) { this.municipalityName.set(String(fromComName)); this.err.set(''); return; }
-      if (fromComId) {
-        const cached = this.munCache.getName(String(fromComId));
-        if (cached) { this.municipalityName.set(cached); this.err.set(''); return; }
-      }
-      this.showMunNotFound(fromComId ?? fromRowId);
-    },
-    error: () => this.showMunNotFound(fromRowId),
-  });
-}
 
-// ★ আগের loadMunicipalityFromDetail এর বাকি কোডটা এই নামে রাখেন
-
+  private resolveMunicipalityName() {
+    const r = this.req();
+    if (!r) return;
+    const fromRowId = this.deepFind(r, ['municipalityId', 'municipality_id']);
+    const fromRowName = this.deepFind(r, ['municipalityName', 'municipalityNameBn', 'municipalityNameEn']);
+    if (fromRowName) { this.municipalityName.set(String(fromRowName)); this.err.set(''); return; }
+    if (fromRowId) {
+      const cached = this.munCache.getName(String(fromRowId));
+      if (cached) { this.municipalityName.set(cached); this.err.set(''); return; }
+    }
+    // ★ কমিটির API শুধু COMMITTEE টাইপে (PROPOSAL এ sourceId কমিটির ID না)
+    const committeeId = this.isCommittee() ? String(r['sourceId'] ?? '') : '';
+    if (!committeeId) { this.showMunNotFound(fromRowId); return; }
+    this.api.getCommittee(committeeId).subscribe({
+      next: (c: any) => {
+        const fromComName = this.deepFind(c, ['municipalityName', 'municipalityNameBn', 'municipalityNameEn']);
+        const fromComId = this.deepFind(c, ['municipalityId', 'municipality_id']);
+        if (fromComName) { this.municipalityName.set(String(fromComName)); this.err.set(''); return; }
+        if (fromComId) {
+          const cached = this.munCache.getName(String(fromComId));
+          if (cached) { this.municipalityName.set(cached); this.err.set(''); return; }
+        }
+        this.showMunNotFound(fromComId ?? fromRowId);
+      },
+      error: () => this.showMunNotFound(fromRowId),
+    });
+  }
 
   private deepFind(obj: any, keys: string[]): any {
     if (!obj || typeof obj !== 'object') return null;
@@ -263,26 +273,20 @@ private resolveMunicipalityName() {
       const cached = this.munCache.getName(id);
       if (cached) { this.municipalityName.set(cached); return; }
     }
-    // ★ AuthService থেকে - Login User এর municipalityId দিয়ে Cache থেকে নাম
     const userMunName = this.getCurrentUserMunicipalityName();
     if (userMunName) { this.municipalityName.set(userMunName); return; }
     this.municipalityName.set('—');
   }
 
-  // ★ AuthService এ শুধু municipalityId: 15 থাকে, নাম থাকে না
-  // ★ নামটা List পেজের Cache (municipalities API) থেকে নিতে হবে
   private getCurrentUserMunicipalityName(): string | null {
-  try {
-    const user = this.auth.currentUser();
-    if (!user) { console.log('[Decision] no user'); return null; }
-    const munId = String((user as any).municipalityId ?? '').trim();
-    console.log('[Decision] user municipalityId:', munId);
-    if (!munId) return null;
-    const name = this.munCache.getName(munId);
-    console.log('[Decision] cache name:', name);
-    return name;
-  } catch { return null; }
-}
+    try {
+      const user = this.auth.currentUser();
+      if (!user) return null;
+      const munId = String((user as any).municipalityId ?? '').trim();
+      if (!munId) return null;
+      return this.munCache.getName(munId);
+    } catch { return null; }
+  }
 
   submit() {
     if (!this.decision) return;

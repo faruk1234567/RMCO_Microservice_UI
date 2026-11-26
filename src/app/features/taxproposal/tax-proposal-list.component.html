@@ -71,7 +71,13 @@
               কমিটি Approve
             </button>
 
-            <button type="button" class="link" [disabled]="!canPrePublish(p)" (click)="prePublish(p)" title="COMMITTEE_APPROVED / DRAFT থেকে">প্রাক-প্রকাশ</button>
+           <!-- ধাপ ১: শুধু COMMITTEE_APPROVED হলে দেখাবে, DRAFT এ দেখাবে না -->
+<button type="button" class="link"
+        *ngIf="p.status === 'COMMITTEE_APPROVED'"
+        [routerLink]="['/tax-proposals', p.id]"
+        [queryParams]="{mode: 'pre-publish'}">
+  প্রাক-প্রকাশ করুন
+</button>
             <button type="button" class="link" [disabled]="!canFinalize(p)" (click)="finalize(p)" title="PRE_PUBLISHED / UNDER_OBJECTION_REVIEW থেকে">চূড়ান্ত</button>
           </td>
         </tr>
@@ -82,4 +88,5 @@
       কোনো প্রস্তাব পাওয়া যায়নি। <a routerLink="/tax-proposals/create">নতুন প্রস্তাব তৈরি করুন</a>
     </div>
   </div>
+  
 </div>

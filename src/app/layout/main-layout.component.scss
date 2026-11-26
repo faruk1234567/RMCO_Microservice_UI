@@ -1,8 +1,11 @@
 /* ============ APP SHELL ============ */
+/* ★ পুরো স্ক্রিনের উচ্চতা। header + nav স্থির, শুধু .main-content scroll হবে */
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--bg-body);
 }
 
@@ -10,6 +13,7 @@
 .top-header {
   position: relative;
   z-index: 100;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -96,14 +100,15 @@
 .main-nav {
   position: relative;
   z-index: 90;
+  flex: 0 0 auto;
   display: flex;
   align-items: stretch;
   flex-wrap: nowrap;
   gap: 2px;
   padding: 0 16px;
   background: var(--primary);
-   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  overflow: visible;          /* scrollbar বন্ধ, dropdown কাটা পড়বে না */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  overflow: visible;          /* dropdown কাটা পড়বে না */
 }
 
 .nav-item {
@@ -125,7 +130,7 @@
   color: rgba(255, 255, 255, 0.85);
   font-family: inherit;
   font-size: 0.92rem;
-font-weight: 500;
+  font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
@@ -230,10 +235,21 @@ font-weight: 500;
 .text-button:hover { opacity: 0.8; }
 
 /* ============ MAIN CONTENT ============ */
+/* ★ scrollbar শুধু এখানে। min-height: 0 না থাকলে flex child scroll হয় না */
 .main-content {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px 24px;
+}
+
+/* ============ PRINT ============ */
+/* ★ প্রিন্টে স্থির উচ্চতা থাকলে শুধু ১ পাতা ছাপা হত, তাই খুলে দেওয়া হলো */
+@media print {
+  .app-shell { height: auto; overflow: visible; display: block; }
+  .main-content { overflow: visible; padding: 0; }
 }
 
 /* ============ RESPONSIVE ============ */

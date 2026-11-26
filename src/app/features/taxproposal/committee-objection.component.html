@@ -1,0 +1,18 @@
+<div class="card committee-card" *ngIf="batch">
+  <h2>আপত্তি বান্ডেল — কমিটির সিদ্ধান্ত</h2>
+  <p>মোট আপত্তি: <b>{{ batch.totalCount }}</b> টি | সামারি: {{ batch.summaryJson }}</p>
+
+  <label>আপনার সিদ্ধান্ত</label>
+  <select [value]="decision" (change)="decision = $any($event.target).value">
+    <option value="SEND_TO_TAX_BRANCH">ট্যাক্স শাখায় পাঠান — সংশোধন লাগবে</option>
+    <option value="FINALIZE">চূড়ান্ত করুন — সংশোধন লাগবে না</option>
+  </select>
+
+  <label>মন্তব্য (ঐচ্ছিক)</label>
+  <textarea [value]="note" (input)="note = $any($event.target).value" rows="2" placeholder="কেন এই সিদ্ধান্ত"></textarea>
+
+  <button class="btn-primary" (click)="vote()" [disabled]="voted">সিদ্ধান্ত জমা দিন</button>
+  <p class="success" *ngIf="voted">✅ আপনার সিদ্ধান্ত জমা হয়েছে। সবাই দিলে সিস্টেম ১ বারই ট্যাক্স শাখায় পাঠাবে।</p>
+
+  <p class="hint">আপনি একা পাঠাচ্ছেন না। আপনি শুধু ভোট দিচ্ছেন। সবাই ভোট দিলে সিস্টেম নিজে পাঠাবে।</p>
+</div>

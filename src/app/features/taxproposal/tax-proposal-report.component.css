@@ -117,3 +117,8 @@
   .print-foot { display: block; }
   .sign-area { border-top: 2px solid #000; }
 }
+.pre-publish-card { margin-top: 20px; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+.pre-publish-card input[type="text"], .pre-publish-card input:not([type="checkbox"]):not([type="file"]) { padding: 10px; }
+.preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); overflow-y: auto; z-index: 1000; padding: 20px; }
+.preview-box { background: #fff; max-width: 900px; margin: 0 auto; padding: 20px; border-radius: 8px; }
+.preview-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; position: sticky; bottom: 0; background: #fff; padding: 12px 0; }

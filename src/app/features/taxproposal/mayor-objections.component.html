@@ -1,0 +1,33 @@
+<div class="card mayor-card" *ngIf="proposal">
+  <h2>আপত্তি — মেয়রের স্ক্রিন</h2>
+  <p>প্রস্তাব নং {{ proposal.proposalNo }}</p>
+
+  <div class="summary-box">
+    <div><span>মোট আপত্তি</span><b>{{ total }}</b></div>
+    <div><span>হার বেশি</span><b>{{ counts['RATE_HIGH'] || 0 }}</b></div>
+    <div><span>মূল্যায়ন ভুল</span><b>{{ counts['VALUATION_WRONG'] || 0 }}</b></div>
+    <div><span>আওতা ভুল</span><b>{{ counts['COVERAGE_WRONG'] || 0 }}</b></div>
+    <div><span>অন্যান্য</span><b>{{ counts['OTHER'] || 0 }}</b></div>
+  </div>
+
+  <p class="hint">মেয়র একটা একটা করে পাঠাবেন না। নিচের ১টা বাটনে সব আপত্তি একসাথে কমিটিতে যাবে।</p>
+
+  <button class="btn-primary big" (click)="sendAll()" [disabled]="total === 0 || sending">
+    {{ sending ? 'পাঠানো হচ্ছে...' : 'সব আপত্তিসহ কমিটিতে পাঠান (' + total + ' টি)' }}
+  </button>
+
+  <p class="success" *ngIf="sent">✅ সব আপত্তি কমিটিতে পাঠানো হয়েছে।</p>
+
+  <!-- চাইলে ভিতরের লিস্ট দেখতে পারবে -->
+  <details>
+    <summary>আপত্তির লিস্ট দেখুন ({{ total }} টি)</summary>
+    <table class="rate-table">
+      <tr><th>নাগরিক</th><th>ধরন</th><th>বিস্তারিত</th></tr>
+      <tr *ngFor="let o of objections">
+        <td>{{ o.citizenName }}</td>
+        <td>{{ o.objectionType }}</td>
+        <td>{{ o.details }}</td>
+      </tr>
+    </table>
+  </details>
+</div>

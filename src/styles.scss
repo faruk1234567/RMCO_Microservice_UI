@@ -237,3 +237,18 @@ app-root .page-container {
   .page-header .btn, .page-header .btn-ghost { width: 100%; text-align: center; }
   .data-table { min-width: 620px; font-size: 13px; }
 }
+
+/* নিচেরটা styles.css এর শেষে বসান */
+.card { background: #fff; padding: 20px; border-radius: 8px; margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.card input, .card select, .card textarea { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; }
+.btn-primary { background: #0b6e4f; color: #fff; border: none; padding: 12px 18px; border-radius: 6px; cursor: pointer; }
+.btn-primary.big { font-size: 16px; padding: 14px; }
+.summary-box { display: flex; gap: 12px; flex-wrap: wrap; }
+.summary-box div { background: #f3f4f6; padding: 12px; border-radius: 6px; display: flex; flex-direction: column; }
+.success { color: #0b6e4f; font-weight: 600; }
+.hint { color: #666; font-size: 13px; }
+
+.objection-page { display: flex; flex-direction: column; gap: 16px; max-width: 700px; margin: 0 auto; }
+.objection-page .card { background: #fff; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
+.objection-page input, .objection-page select, .objection-page textarea { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; }
+.btn-primary { background: #0b6e4f; color: #fff; border: none; padding: 12px 18px; border-radius: 6px; cursor: pointer; }

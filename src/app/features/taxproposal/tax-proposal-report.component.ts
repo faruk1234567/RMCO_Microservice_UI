@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
@@ -13,7 +13,10 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 })
 export class TaxProposalReportComponent implements OnInit, OnDestroy {
   proposal: any = null;
-  proposalId = '';
+  // ★ অন্য কম্পোনেন্টের ভেতরে বসালে [proposalId] দিয়ে ID আসবে, না দিলে URL এর :id থেকে
+  @Input() proposalId = '';
+  // ★ true হলে শুধু প্রস্তাবের তথ্য দেখায়: স্বাক্ষর/সীল/প্রিন্ট অংশ ছাড়া (কমিটির সদস্যের পাঠের জন্য)
+  @Input() viewOnly = false;
   municipalityId: number | null = null;
   municipalityName = '';
   formattedDate = '';
@@ -52,7 +55,7 @@ export class TaxProposalReportComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    this.proposalId = this.route.snapshot.paramMap.get('id') || '';
+    this.proposalId = this.proposalId || this.route.snapshot.paramMap.get('id') || '';
     this.printedOn = this.formatDate(new Date());
     this.hideLayoutWhenPrinting();
     this.loadProposal();
@@ -215,7 +218,7 @@ export class TaxProposalReportComponent implements OnInit, OnDestroy {
 
   // ---------- signatures ----------
   loadSignatures() {
-    if (!this.municipalityId) return;
+    if (this.viewOnly || !this.municipalityId) return;   // viewOnly তে স্বাক্ষরের API ডাকার দরকার নেই
     this.http.get<any>(`/signature-service/signatures?municipalityId=${this.municipalityId}`).subscribe({
       next: (res) => {
         const list = res?.data?.content ?? res?.data ?? res?.content ?? res;
@@ -312,4 +315,36 @@ export class TaxProposalReportComponent implements OnInit, OnDestroy {
       return cache[String(target)] || '';
     } catch { return ''; }
   }
+  prePublishForm = {
+  placeOrMethod: 'Municipal Office Notice Board',
+  objectionWindowMonths: 1,
+  publicNoticeEnabled: true
+};
+showPreview = false;
+noticeFile: File | null = null;
+noticeFileName = '';
+noticeDocumentId: string | null = null;
+
+onNoticeFileSelect(event: any) {
+  const f = event.target.files[0];
+  if (!f) return;
+  if (f.size > 5 * 1024 * 1024) { alert('ফাইল 5 MB এর বেশি হবে না'); return; }
+  this.noticeFile = f;
+  this.noticeFileName = f.name;
+}
+
+openPreview() { this.showPreview = true; }
+
+confirmPublish() {
+  this.http.post(`/tax-proposals/${this.proposal.id}/pre-publish`, {
+    placeOrMethod: this.prePublishForm.placeOrMethod,
+    objectionWindowMonths: this.prePublishForm.objectionWindowMonths,
+    publicNoticeEnabled: this.prePublishForm.publicNoticeEnabled,
+    noticeDocumentId: this.noticeDocumentId
+  }).subscribe(() => {
+    this.showPreview = false;
+    alert('প্রাক-প্রকাশ হয়ে গেছে');
+    this.loadProposal();
+  });
+}
 }

@@ -27,7 +27,7 @@ export class TaxproposalListComponent implements OnInit {
   statusBn: Record<string, string> = {
     DRAFT: 'খসড়া - শাখায় আছে',
     SENT_TO_COMMITTEE: 'কমিটিতে পাঠানো হইছে',
-    COMMITTEE_APPROVED: 'কমিটি অনুমোদন করছে - হেয়ারিংয়ে যাবে',
+    COMMITTEE_APPROVED: 'কমিটি অনুমোদন করছে - প্রাক-প্রকাশ করুন',
     PRE_PUBLISHED: 'প্রাক-প্রকাশিত',
     UNDER_OBJECTION_REVIEW: 'আপত্তি পর্যালোচনায়',
     FINALIZED: 'চূড়ান্ত',
@@ -150,8 +150,8 @@ export class TaxproposalListComponent implements OnInit {
 
   // প্রাক-প্রকাশ বাটন কখন চালু থাকবে - এখন COMMITTEE_APPROVED এর পর
   canPrePublish(p: any): boolean {
-    return p?.status === 'COMMITTEE_APPROVED' || p?.status === 'DRAFT';
-  }
+  return p.status === 'COMMITTEE_APPROVED';
+}
 
   canFinalize(p: any): boolean {
     return p?.status === 'PRE_PUBLISHED' || p?.status === 'UNDER_OBJECTION_REVIEW';

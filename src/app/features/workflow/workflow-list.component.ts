@@ -1,4 +1,5 @@
-// D-01 : অনুমোদনকারীর inbox (আমার অপেক্ষমাণ অনুরোধ) - UPDATED - COMPLETE - FINAL
+// D-01 : অনুমোদনকারীর inbox (আমার অপেক্ষমাণ অনুরোধ)
+// ★ UPDATED: title এখন backend এর title আগে ধরে, progress bar এ ০ দিয়ে ভাগ guard
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -51,17 +52,17 @@ import { ENGINE_STYLES, Row, STATUS_BN, errMsg, fmtDate, idOf, pick } from '../c
                   <td class="progress-cell">
                     @if (detail(id(r)); as d) {
                       <div><strong>ধাপ {{ approvedCount(d) }} / {{ d.totalSteps }} সম্পন্ন</strong></div>
-                      <div class="progress-bar"><div class="progress-fill" [style.width.%]="approvedCount(d) / d.totalSteps * 100"></div></div>
+                      <div class="progress-bar"><div class="progress-fill" [style.width.%]="d.totalSteps ? approvedCount(d) / d.totalSteps * 100 : 0"></div></div>
                       <div class="step-chips">
                         @for (s of d.steps; track s.stepNo) {
                           <span class="chip"
                             [class.chip-approved]="s.decision === 'APPROVED'"
                             [class.chip-pending]="s.decision === 'PENDING' && !s.isCurrentStep"
-                            [class.chip-current]="s.isCurrentStep"
+                            [class.chip-current]="s.isCurrentStep && s.decision === 'PENDING'"
                             [class.chip-rejected]="s.decision === 'REJECTED'">
                             @if (s.decision === 'APPROVED') { ধাপ {{ s.stepNo }} অনুমোদিত }
                             @else if (s.decision === 'REJECTED') { ধাপ {{ s.stepNo }} বাতিল }
-                            @else if (s.isCurrentStep) { ধাপ {{ s.stepNo }} চলমান }
+                            @else if (s.isCurrentStep) { ধাপ {{ s.stepNo }} চলমান @if (s.memberCount > 1) { ({{ s.approvedCount }}/{{ s.memberCount }}) } }
                             @else { ধাপ {{ s.stepNo }} অপেক্ষায় }
                           </span>
                         }
@@ -73,7 +74,7 @@ import { ENGINE_STYLES, Row, STATUS_BN, errMsg, fmtDate, idOf, pick } from '../c
                   </td>
                   <td><span [class]="'st st-' + r['status']">{{ bn(r['status']) }}</span></td>
                   <td>{{ fmt(pick(r, 'submittedAt', 'createdAt')) }}</td>
-                  <td>{{ fmt(pick(r, 'dueAt', 'deadline')) }} @if (overdue(r)) { <span class="st st-REJECTED">সময় পেরিয়েছে</span> }</td>
+                  <td>{{ fmt(pick(r, 'dueAt', 'deadline', 'slaDeadline')) }} @if (overdue(r)) { <span class="st st-REJECTED">সময় পেরিয়েছে</span> }</td>
                   <td><a class="btn btn-primary btn-sm" [routerLink]="['/workflow', id(r)]">দেখুন ও সিদ্ধান্ত</a></td>
                 </tr>
               }
@@ -88,7 +89,7 @@ export class WorkflowListComponent implements OnInit {
   private api = inject(EngineApiService);
   private http = inject(HttpClient);
   private munCache = inject(MunicipalityCacheService);
-  private auth = inject(AuthService); // ★ List এও AuthService যোগ করা
+  private auth = inject(AuthService);
 
   items = signal<Row[]>([]);
   details = signal<Map<string, any>>(new Map());
@@ -96,9 +97,9 @@ export class WorkflowListComponent implements OnInit {
   loading = signal(true); err = signal('');
   id = idOf; pick = pick; fmt = (v: any) => fmtDate(v, true); bn = (s: string) => STATUS_BN[s] ?? s;
 
-  title = (r: Row): string => pick(r, 'committeeName', 'nameBn', 'title', 'subject', 'entityName') ?? ('অনুরোধ #' + idOf(r).slice(0, 8));
+  // ★ backend এর title সবার আগে
+  title = (r: Row): string => pick(r, 'title', 'committeeName', 'nameBn', 'subject', 'entityName') ?? ('অনুরোধ #' + idOf(r).slice(0, 8));
 
-  // ★ পৌরসভার নাম - Detail -> Row -> AuthService + Cache
   municipalityName = (r: Row): string => {
     const d: any = this.details().get(idOf(r));
     const direct = d ? pick(d, 'municipalityName', 'municipalityNameBn', 'municipalityNameEn', 'municipality') ?? pick(d?.['data'], 'municipalityName', 'municipalityNameBn') : null;
@@ -110,7 +111,6 @@ export class WorkflowListComponent implements OnInit {
     }
     const rowName = pick(r, 'municipalityName', 'municipalityNameBn');
     if (rowName) return String(rowName);
-    // ★ Fallback - Login User এর পৌরসভা (Header এর মতো)
     const user = this.auth.currentUser();
     const userMunId = String((user as any)?.municipalityId ?? '').trim();
     if (userMunId) {
@@ -120,7 +120,7 @@ export class WorkflowListComponent implements OnInit {
     return '—';
   };
 
-  overdue = (r: Row): boolean => { const d = pick(r, 'dueAt', 'deadline'); return !!d && new Date(d).getTime() < Date.now(); };
+  overdue = (r: Row): boolean => { const d = pick(r, 'dueAt', 'deadline', 'slaDeadline'); return !!d && new Date(d).getTime() < Date.now(); };
   overdueCount = computed(() => this.items().filter(r => this.overdue(r)).length);
   filtered = computed(() => {
     const s = this.q().trim().toLowerCase();
@@ -136,21 +136,20 @@ export class WorkflowListComponent implements OnInit {
 
   ngOnInit() { this.load(); }
 
- load() {
-  this.loading.set(true); this.err.set('');
-  this.loadMunicipalities(); // ★ এইটা শুধু ensureLoaded কল করবে
-  this.api.myPending().subscribe({
-    next: (l) => { this.items.set(l ?? []); this.loading.set(false); this.loadDetails(l ?? []); },
-    error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
-  });
-}
+  load() {
+    this.loading.set(true); this.err.set('');
+    this.loadMunicipalities();
+    this.api.myPending().subscribe({
+      next: (l) => { this.items.set(l ?? []); this.loading.set(false); this.loadDetails(l ?? []); },
+      error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
+    });
+  }
 
+  private loadMunicipalities() {
+    this.munCache.ensureLoaded().subscribe({ error: () => {} });
+  }
 
- private loadMunicipalities() {
-  this.munCache.ensureLoaded().subscribe({ error: () => {} });
-}
-
-  // ★ Detail - my-pending List থেকে, getApprovalDetail কল হবে না (404)
+  // ★ Detail - my-pending List থেকে, getApprovalDetail কল হবে না
   private loadDetails(list: Row[]) {
     const next = new Map<string, any>();
     for (const r of list) {
@@ -163,6 +162,8 @@ export class WorkflowListComponent implements OnInit {
           stepNo: Number(s['stepNo'] ?? s['levelNo'] ?? s['step'] ?? i + 1),
           decision: String(s['decision'] ?? s['status'] ?? 'PENDING'),
           isCurrentStep: Boolean(s['isCurrentStep'] ?? s['isCurrent'] ?? String(s['stepNo'] ?? s['levelNo']) === String(r['stepNo'] ?? r['levelNo'])),
+          memberCount: Number(s['memberCount'] ?? 1),
+          approvedCount: Number(s['approvedCount'] ?? 0),
           decidedByName: s['decidedByName'] ?? s['approverName'] ?? s['decidedBy'] ?? null,
           decidedAt: s['decidedAt'] ?? s['decided_at'] ?? s['updatedAt'] ?? null,
           municipalityId: r['municipalityId'] ?? s['municipalityId'] ?? null,
