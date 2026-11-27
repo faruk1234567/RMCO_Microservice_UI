@@ -1,24 +1,53 @@
-// O-03 : আপত্তির বিস্তারিত + কর্মকর্তার পদক্ষেপ: গ্রহণ → ফরোয়ার্ড → শুনানি → সিদ্ধান্ত
+// O-03 : আপত্তির বিস্তারিত — ধাপের রেখা + "এখন আপনার কাজ"
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ObjectionApi } from '../../core/services/municipal-api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { CommitteeSelectComponent } from './committee-select.component';
-import { MUNI_STYLES, RK, Recent, Row, bnStatus, clean, entries, errMsg, fmtDate, isUuid } from './municipal-shared';
+import { MUNI_STYLES, RK, Recent, Row, errMsg, fmtDate, isUuid } from './municipal-shared';
 
-type Tab = 'info' | 'receive' | 'forward' | 'hearing' | 'decision';
+const STATUS_BN: Record<string, string> = {
+  SUBMITTED: 'জমা হয়েছে',
+  COMMITTEE_REVIEW: 'কমিটিতে আছে',
+  WITH_DEPARTMENT: 'বিভাগে যাচাই চলছে',
+  PENDING_COMMITTEE_APPROVAL: 'কমিটির অনুমোদনের অপেক্ষায়',
+  APPROVED: 'গৃহীত (চূড়ান্ত)',
+  REJECTED: 'বাতিল (চূড়ান্ত)',
+};
+const KIND_BN: Record<string, string> = {
+  REGISTERED_CUSTOMER: 'নিবন্ধিত নাগরিক', HOLDING_OWNER: 'হোল্ডিং মালিক',
+  CITIZEN: 'নাগরিক', ORGANIZATION: 'প্রতিষ্ঠান',
+};
+const STEPS = [
+  { s: ['SUBMITTED'], l: 'জমা' },
+  { s: ['COMMITTEE_REVIEW'], l: 'কমিটি' },
+  { s: ['WITH_DEPARTMENT'], l: 'বিভাগ' },
+  { s: ['PENDING_COMMITTEE_APPROVAL'], l: 'কমিটির অনুমোদন' },
+  { s: ['APPROVED', 'REJECTED'], l: 'চূড়ান্ত' },
+];
 
 @Component({
   selector: 'app-objection-detail',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, CommitteeSelectComponent],
-  styles: [MUNI_STYLES],
+  styles: [MUNI_STYLES, `
+    .stepper{display:flex;gap:8px;margin:14px 0 18px;flex-wrap:wrap}
+    .step{flex:1;min-width:110px;text-align:center;padding:10px 6px;border-radius:8px;background:#eef1f2;color:#6b7780;font-size:14px}
+    .step.done{background:#d9efe3;color:#0b6b46}
+    .step.now{background:#0b6b46;color:#fff;font-weight:600}
+    .big{font-size:16px;padding:12px 22px}
+    .btn-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
+    .btn-danger{background:#b3261e;color:#fff;border:0;border-radius:6px;cursor:pointer}
+    .todo{border-left:5px solid #0b6b46}
+  `],
   template: `
     <div class="page-container">
       <div class="page-header">
         <div><a routerLink="/objections" class="muted">← আপত্তির তালিকা</a>
-          <h1>আপত্তি {{ o()?.['objectionNo'] || '' }} @if (o()) { <span [class]="'st st-' + o()!['status']">{{ bn(o()!['status']) }}</span> }</h1></div>
+          <h1>আপত্তি {{ o()?.['objectionNo'] || '' }}
+            @if (o()) { <span [class]="'st st-' + o()!['status']">{{ statusBn() }}</span> }</h1></div>
       </div>
       @if (err()) { <div class="alert alert-err">{{ err() }}</div> }
       @if (msg()) { <div class="alert alert-ok">{{ msg() }}</div> }
@@ -26,64 +55,84 @@ type Tab = 'info' | 'receive' | 'forward' | 'hearing' | 'decision';
       @if (loading()) { <div class="empty">লোড হচ্ছে...</div> }
 
       @if (o()) {
-        <div class="tabs-row">
-          @for (t of tabs; track t.id) { <button class="tab-btn" [class.active]="tab() === t.id" (click)="tab.set(t.id); problems.set([])">{{ t.l }}</button> }
+        <div class="stepper">
+          @for (st of steps; track st.l; let i = $index) {
+            <div class="step" [class.done]="i < stepIndex()" [class.now]="i === stepIndex()">{{ st.l }}</div>
+          }
         </div>
 
-        @switch (tab()) {
-          @case ('info') {
-            <div class="card mb-2"><div class="card-body">
-              <dl class="kv">@for (e of rows(); track e.k) { <dt>{{ e.label }}</dt><dd>{{ e.v }}</dd> }</dl>
-            </div></div>
-            @if (hearings().length) {
-              <div class="card"><div class="card-header"><h3>শুনানি</h3></div><div class="card-body">
-                @for (h of hearings(); track $index) { <div style="padding:6px 0;border-bottom:1px solid #eef1f2">@for (e of rowsOf(h); track e.k) { <span class="chip">{{ e.label }}: {{ e.v }}</span> }</div> }
+        <!-- এখন আপনার কাজ -->
+        @switch (o()!['status']) {
+          @case ('SUBMITTED') {
+            @if (can('MAYOR')) {
+              <div class="card mb-2 todo"><div class="card-header"><h3>এখন আপনার কাজ: কমিটিতে পাঠান</h3></div><div class="card-body">
+                <div class="form-group"><label>কোন কমিটি <span class="required">*</span></label><app-committee-select [(value)]="fw.committeeId" /></div>
+                <div class="form-group"><label>মন্তব্য (ঐচ্ছিক)</label><textarea class="form-control" rows="2" [(ngModel)]="fw.comment"></textarea></div>
+                <button class="btn btn-primary big" [disabled]="busy()" (click)="forward()">কমিটিতে পাঠান</button>
               </div></div>
             }
           }
-          @case ('receive') {
-            <div class="card"><div class="card-body">
-              <p>আপত্তিটি গ্রহণ (receive) করলে এটি আপনার দায়িত্বে নথিভুক্ত হবে।</p>
-              <button class="btn btn-primary" [disabled]="busy()" (click)="receive()">আপত্তি গ্রহণ করুন</button>
-            </div></div>
+          @case ('COMMITTEE_REVIEW') {
+            @if (can('COMMITTEE')) {
+              <div class="card mb-2 todo"><div class="card-header"><h3>এখন আপনার কাজ: বিভাগে পাঠান</h3></div><div class="card-body">
+                <div class="form-group"><label>কোন বিভাগ <span class="required">*</span></label><app-committee-select [(value)]="dp.departmentId" /></div>
+                <div class="form-group"><label>মন্তব্য (ঐচ্ছিক)</label><textarea class="form-control" rows="2" [(ngModel)]="dp.comment"></textarea></div>
+                <button class="btn btn-primary big" [disabled]="busy()" (click)="sendToDept()">বিভাগে পাঠান</button>
+              </div></div>
+            }
           }
-          @case ('forward') {
-            <div class="card"><div class="card-body">
-              <div class="grid2">
-                <div class="form-group"><label>কোন কমিটির কাছে পাঠাবেন <span class="required">*</span></label><app-committee-select [(value)]="fw.committeeId" /></div>
-                <div class="form-group"><label>আপনার ভূমিকা (role)</label><input class="form-control" [(ngModel)]="fw.role" /></div>
-              </div>
-              <div class="form-group"><label>মন্তব্য</label><textarea class="form-control" rows="3" [(ngModel)]="fw.comment"></textarea></div>
-              <button class="btn btn-primary" [disabled]="busy()" (click)="forward()">ফরোয়ার্ড করুন</button>
-            </div></div>
+          @case ('WITH_DEPARTMENT') {
+            @if (can('DEPARTMENT')) {
+              <div class="card mb-2 todo"><div class="card-header"><h3>এখন আপনার কাজ: যাচাই করে সুপারিশ দিন</h3></div><div class="card-body">
+                <div class="btn-row">
+                  <button class="btn big" [class.btn-primary]="rc.decision === 'APPROVED'" (click)="rc.decision = 'APPROVED'">✔ গৃহীত</button>
+                  <button class="btn big" [class.btn-primary]="rc.decision === 'REJECTED'" (click)="rc.decision = 'REJECTED'">✖ বাতিল</button>
+                </div>
+                @if (rc.decision === 'APPROVED') {
+                  <div class="form-group" style="margin-top:12px"><label>নতুন হার / মূল্য</label>
+                    <input type="number" class="form-control" style="max-width:240px" [(ngModel)]="rc.newRate" /></div>
+                }
+                <div class="form-group" style="margin-top:12px"><label>কারণ <span class="required">*</span></label>
+                  <textarea class="form-control" rows="3" [(ngModel)]="rc.reason"></textarea></div>
+                <button class="btn btn-primary big" [disabled]="busy()" (click)="recommend()">সুপারিশ জমা দিন</button>
+              </div></div>
+            }
           }
-          @case ('hearing') {
-            <div class="card"><div class="card-body">
-              <div class="form-group"><label>শুনানি গ্রহণকারী কমিটি <span class="required">*</span></label><app-committee-select [(value)]="hr.committeeId" /></div>
-              <div class="grid3">
-                <div class="form-group"><label>তারিখ <span class="required">*</span></label><input type="date" class="form-control" [(ngModel)]="hr.scheduledDate" /></div>
-                <div class="form-group"><label>সময় <span class="required">*</span></label><input type="time" class="form-control" [(ngModel)]="hr.scheduledTime" /></div>
-                <div class="form-group"><label>স্থান <span class="required">*</span></label><input class="form-control" [(ngModel)]="hr.venue" /></div>
-              </div>
-              <button class="btn btn-primary" [disabled]="busy()" (click)="schedule()">শুনানি নির্ধারণ করুন</button>
-            </div></div>
+          @case ('PENDING_COMMITTEE_APPROVAL') {
+            @if (can('COMMITTEE')) {
+              <div class="card mb-2 todo"><div class="card-header"><h3>এখন আপনার কাজ: অনুমোদন দিন</h3></div><div class="card-body">
+                <p>বিভাগের সুপারিশ: <b>{{ o()!['recommendedDecision'] === 'APPROVED' ? 'গৃহীত' : 'বাতিল' }}</b></p>
+                <p class="muted">কারণ: {{ o()!['recommendedReason'] }}</p>
+                <label class="check" style="margin:10px 0"><input type="checkbox" [(ngModel)]="confirm" /> আমি বুঝেছি, অনুমোদনের পর বদলানো যাবে না</label>
+                <div class="btn-row">
+                  <button class="btn btn-primary big" [disabled]="busy() || !confirm" (click)="approve()">অনুমোদন</button>
+                </div>
+                <div class="form-group" style="margin-top:18px"><label>একমত না হলে ফেরত পাঠানোর কারণ</label>
+                  <textarea class="form-control" rows="2" [(ngModel)]="rt.reason"></textarea></div>
+                <button class="btn big" [disabled]="busy()" (click)="giveBack()">বিভাগে ফেরত পাঠান</button>
+              </div></div>
+            }
           }
-          @case ('decision') {
-            <div class="card"><div class="card-body">
-              <div class="grid2">
-                <div class="form-group"><label>সিদ্ধান্ত <span class="required">*</span></label>
-                  <input class="form-control" list="decisions" [(ngModel)]="dc.decision" placeholder="যেমন ACCEPTED" />
-                  <datalist id="decisions">@for (h of decisionHints; track h) { <option [value]="h"></option> }</datalist></div>
-                <div class="form-group"><label>সিদ্ধান্ত গ্রহণকারী কমিটি <span class="required">*</span></label><app-committee-select [(value)]="dc.decidedByCommitteeId" /></div>
-              </div>
-              <div class="form-group"><label>কারণ <span class="required">*</span></label><textarea class="form-control" rows="3" [(ngModel)]="dc.reason"></textarea></div>
-              <div class="form-group"><label>ফলস্বরূপ পরিবর্তন (ঐচ্ছিক, JSON)</label>
-                <textarea class="form-control" rows="3" [(ngModel)]="dc.resultingChange" placeholder='{"newRate": 12}'></textarea></div>
-              <label class="check" style="margin-bottom:10px"><input type="checkbox" [(ngModel)]="confirm" /> আমি বুঝেছি, সিদ্ধান্ত জমা দেওয়ার পর বদলানো যাবে না</label>
-              <button class="btn btn-primary" [disabled]="busy() || !confirm" (click)="decide()">সিদ্ধান্ত জমা দিন</button>
-            </div></div>
+          @default {
+            @if (isFinal()) {
+              <div class="alert alert-ok">এই আপত্তির সিদ্ধান্ত চূড়ান্ত: <b>{{ statusBn() }}</b></div>
+            }
           }
         }
+
+        <!-- বিবরণ -->
+        <div class="card mb-2"><div class="card-header"><h3>বিবরণ</h3></div><div class="card-body">
+          <dl class="kv">
+            <dt>আপত্তি নম্বর</dt><dd>{{ o()!['objectionNo'] }}</dd>
+            <dt>আপত্তিকারীর নাম</dt><dd>{{ o()!['objectorName'] }}</dd>
+            <dt>আপত্তিকারীর ধরন</dt><dd>{{ kindBn() }}</dd>
+            <dt>জমার সময়</dt><dd>{{ fmt(o()!['submittedAt']) }}</dd>
+            <dt>আপত্তির শেষ তারিখ</dt><dd>{{ fmt(o()!['windowDeadline']) }}</dd>
+          </dl>
+          @for (e of formEntries(); track e.k) {
+            <div class="form-group"><label>{{ e.k }}</label><div>{{ e.v }}</div></div>
+          }
+        </div></div>
       }
     </div>
   `,
@@ -91,27 +140,37 @@ type Tab = 'info' | 'receive' | 'forward' | 'hearing' | 'decision';
 export class ObjectionDetailComponent implements OnInit {
   private api = inject(ObjectionApi);
   private route = inject(ActivatedRoute);
+  private auth = inject(AuthService);
 
-  tabs: { id: Tab; l: string }[] = [
-    { id: 'info', l: 'বিবরণ' }, { id: 'receive', l: 'গ্রহণ' }, { id: 'forward', l: 'ফরোয়ার্ড' },
-    { id: 'hearing', l: 'শুনানি' }, { id: 'decision', l: 'সিদ্ধান্ত' },
-  ];
-  // ⚠ সিদ্ধান্তের মান (decision) অনুমান; আপনার backend-এর মান লিখুন
-  decisionHints = ['ACCEPTED', 'REJECTED', 'PARTIALLY_ACCEPTED'];
+  steps = STEPS;
   id = '';
   o = signal<Row | null>(null);
-  tab = signal<Tab>('info');
   loading = signal(true); busy = signal(false);
   err = signal(''); msg = signal(''); problems = signal<string[]>([]);
-  fw = { committeeId: '', role: 'MAYOR', comment: '' };
-  hr = { committeeId: '', scheduledDate: '', scheduledTime: '', venue: '' };
-  dc = { decision: '', reason: '', decidedByCommitteeId: '', resultingChange: '' };
   confirm = false;
 
-  bn = bnStatus;
-  rows = computed(() => entries(this.o()).filter(e => e.k !== 'id'));
-  rowsOf = (r: Row) => entries(r);
-  hearings = computed<Row[]>(() => this.o()?.['hearings'] ?? []);
+  fw = { committeeId: '', comment: '' };
+  dp = { departmentId: '', comment: '' };
+  rc: { decision: string; newRate: number | null; reason: string } = { decision: '', newRate: null, reason: '' };
+  rt = { reason: '' };
+
+  fmt = fmtDate;
+  statusBn = computed(() => STATUS_BN[this.o()?.['status']] ?? this.o()?.['status'] ?? '');
+  kindBn = computed(() => KIND_BN[this.o()?.['objectorKind']] ?? this.o()?.['objectorKind'] ?? '');
+  stepIndex = computed(() => STEPS.findIndex(s => s.s.includes(this.o()?.['status'])));
+  isFinal = computed(() => ['APPROVED', 'REJECTED'].includes(this.o()?.['status']));
+  formEntries = computed(() => Object.entries(this.o()?.['formValues'] ?? {}).map(([k, v]) => ({ k, v: String(v) })));
+
+  /** ⚠ রোল চেনার অনুমান: user.roles / user.role থেকে। auth.service.ts দেখে ঠিক করব। রোল না পেলে সব বাটন দেখায় (ডেভ মোড) */
+  private roles = computed<string[]>(() => {
+    const u: any = this.auth.currentUser();
+    const r = u?.roles ?? u?.role ?? [];
+    return (Array.isArray(r) ? r : [r]).map((x: any) => String(x?.code ?? x?.name ?? x).toUpperCase());
+  });
+  can(kind: 'MAYOR' | 'COMMITTEE' | 'DEPARTMENT'): boolean {
+    const rs = this.roles();
+    return rs.length === 0 || rs.some(r => r.includes(kind));
+  }
 
   ngOnInit() { this.id = this.route.snapshot.paramMap.get('id') ?? ''; this.load(); }
 
@@ -120,52 +179,46 @@ export class ObjectionDetailComponent implements OnInit {
     this.api.get(this.id).subscribe({
       next: (r) => {
         this.o.set(r); this.loading.set(false);
-        Recent.add(RK.objection, this.id, String(r['objectionNo'] ?? r['objectorName'] ?? this.id.slice(0, 8)));
-        const c = r['committeeId'];   // ফরোয়ার্ড হয়ে থাকলে সেই কমিটিই শুনানি ও সিদ্ধান্তে আগে থেকে বসানো
-        if (c) { this.hr.committeeId = this.hr.committeeId || c; this.dc.decidedByCommitteeId = this.dc.decidedByCommitteeId || c; }
+        Recent.add(RK.objection, this.id, String(r['objectionNo'] ?? this.id.slice(0, 8)));
       },
       error: (e) => { this.err.set(errMsg(e)); this.loading.set(false); },
     });
   }
 
-  private run(call: any, okMsg: string, after?: () => void) {
+  private run(call: any, okMsg: string) {
     this.busy.set(true); this.err.set(''); this.msg.set(''); this.problems.set([]);
     call.subscribe({
-      next: () => { this.busy.set(false); this.msg.set(okMsg); after?.(); this.load(); this.tab.set('info'); },
+      next: () => { this.busy.set(false); this.msg.set(okMsg); this.confirm = false; this.load(); },
       error: (e: any) => { this.busy.set(false); this.err.set(errMsg(e)); },
     });
   }
 
-  receive() { this.run(this.api.receive(this.id), 'আপত্তি গ্রহণ করা হয়েছে।'); }
-
   forward() {
     if (!isUuid(this.fw.committeeId)) { this.problems.set(['কমিটি বাছাই করুন']); return; }
-    this.run(this.api.forward(this.id, { committeeId: this.fw.committeeId.trim(), role: this.fw.role.trim() || 'MAYOR', comment: this.fw.comment.trim() || undefined }),
-      'আপত্তি কমিটির কাছে ফরোয়ার্ড করা হয়েছে।', () => { this.fw.comment = ''; });
+    this.run(this.api.forward(this.id, { committeeId: this.fw.committeeId, comment: this.fw.comment.trim() || undefined }),
+      'কমিটির কাছে পাঠানো হয়েছে।');
   }
 
-  schedule() {
-    const p: string[] = [];
-    if (!isUuid(this.hr.committeeId)) p.push('কমিটি বাছাই করুন');
-    if (!this.hr.scheduledDate) p.push('শুনানির তারিখ দিন');
-    if (!this.hr.scheduledTime) p.push('শুনানির সময় দিন');
-    if (!this.hr.venue.trim()) p.push('শুনানির স্থান দিন');
-    this.problems.set(p); if (p.length) return;
-    this.run(this.api.scheduleHearing(this.id, clean(this.hr)), 'শুনানি নির্ধারিত হয়েছে।', () => { this.hr.scheduledDate = ''; this.hr.scheduledTime = ''; this.hr.venue = ''; });
+  sendToDept() {
+    if (!isUuid(this.dp.departmentId)) { this.problems.set(['বিভাগ বাছাই করুন']); return; }
+    this.run(this.api.sendToDepartment(this.id, { departmentId: this.dp.departmentId, comment: this.dp.comment.trim() || undefined }),
+      'বিভাগে পাঠানো হয়েছে।');
   }
 
-  decide() {
+  recommend() {
     const p: string[] = [];
-    if (!this.dc.decision.trim()) p.push('সিদ্ধান্ত লিখুন');
-    if (!this.dc.reason.trim()) p.push('কারণ লিখুন');
-    if (!isUuid(this.dc.decidedByCommitteeId)) p.push('সিদ্ধান্ত গ্রহণকারী কমিটি বাছাই করুন');
-    let resultingChange: any;
-    if (this.dc.resultingChange.trim()) {
-      try { resultingChange = JSON.parse(this.dc.resultingChange); } catch { p.push('"ফলস্বরূপ পরিবর্তন" সঠিক JSON নয়'); }
-    }
+    if (!this.rc.decision) p.push('গৃহীত বা বাতিল বাছাই করুন');
+    if (!this.rc.reason.trim()) p.push('কারণ লিখুন');
     this.problems.set(p); if (p.length) return;
-    const body: Row = { decision: this.dc.decision.trim(), reason: this.dc.reason.trim(), decidedByCommitteeId: this.dc.decidedByCommitteeId.trim() };
-    if (resultingChange) body['resultingChange'] = resultingChange;
-    this.run(this.api.decide(this.id, body), 'সিদ্ধান্ত জমা হয়েছে।', () => { this.dc.reason = ''; this.dc.resultingChange = ''; this.confirm = false; });
+    const body: Row = { decision: this.rc.decision, reason: this.rc.reason.trim() };
+    if (this.rc.decision === 'APPROVED' && this.rc.newRate != null) body['resultingChange'] = { newRate: this.rc.newRate };
+    this.run(this.api.recommend(this.id, body), 'সুপারিশ জমা হয়েছে, কমিটির অনুমোদনের অপেক্ষায়।');
+  }
+
+  approve() { this.run(this.api.approve(this.id), 'অনুমোদিত হয়েছে। সিদ্ধান্ত চূড়ান্ত।'); }
+
+  giveBack() {
+    if (!this.rt.reason.trim()) { this.problems.set(['ফেরত পাঠানোর কারণ লিখুন']); return; }
+    this.run(this.api.returnBack(this.id, this.rt.reason.trim()), 'বিভাগে ফেরত পাঠানো হয়েছে।');
   }
 }

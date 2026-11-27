@@ -159,7 +159,7 @@ export const routes: Routes = [
       { path: 'tax-proposals/:id', loadComponent: () => import('./features/municipal/tax-proposal-detail.component').then(m => m.TaxProposalDetailComponent) },
 
       { path: 'objections', loadComponent: () => import('./features/municipal/objection-list.component').then(m => m.ObjectionListComponent) },
-      { path: 'objections/new', loadComponent: () => import('./features/municipal/objection-form.component').then(m => m.ObjectionFormComponent) },
+     { path: 'objections/new', loadComponent: () => import('./features/municipal/objection-new.component').then(m => m.ObjectionNewComponent) },
       { path: 'objections/:id', loadComponent: () => import('./features/municipal/objection-detail.component').then(m => m.ObjectionDetailComponent) },
       { path: 'notices', loadComponent: () => import('./features/municipal/notice-home.component').then(m => m.NoticeHomeComponent) },
       { path: 'notices/messages/new', loadComponent: () => import('./features/municipal/notice-message-form.component').then(m => m.NoticeMessageFormComponent) },

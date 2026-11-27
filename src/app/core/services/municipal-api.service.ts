@@ -41,14 +41,20 @@ export class ObjectionApi {
 
   submit(body: Row): Observable<Row> { return this.http.post(this.u('/objections'), body).pipe(unwrap()); }
   get(id: string): Observable<Row> { return this.http.get(this.u(`/objections/${id}`)).pipe(unwrap()); }
-  mine(): Observable<Row[]> { return this.http.get(this.u('/me/objections')).pipe(unwrap()); }
-  receive(id: string): Observable<Row> { return this.http.post(this.u(`/objections/${id}/receive`), {}).pipe(unwrap()); }
+ mine(): Observable<Row[]> { return this.http.get(this.u('/objections/me')).pipe(unwrap()); }
+
+  
   /** body: committeeId (বাধ্যতামূলক), comment, role (ডিফল্ট MAYOR) */
   forward(id: string, body: { committeeId: string; comment?: string; role?: string }): Observable<Row> {
     return this.http.post(this.u(`/objections/${id}/forward`), body).pipe(unwrap());
   }
-  scheduleHearing(id: string, body: Row): Observable<Row> { return this.http.post(this.u(`/objections/${id}/hearings`), body).pipe(unwrap()); }
-  decide(id: string, body: Row): Observable<Row> { return this.http.post(this.u(`/objections/${id}/decision`), body).pipe(unwrap()); }
+    sendToDepartment(id: string, body: { departmentId: string; comment?: string }): Observable<Row> {
+    return this.http.post(this.u(`/objections/${id}/send-to-department`), body).pipe(unwrap());
+  }
+  recommend(id: string, body: Row): Observable<Row> { return this.http.post(this.u(`/objections/${id}/recommendation`), body).pipe(unwrap()); }
+  approve(id: string): Observable<Row> { return this.http.post(this.u(`/objections/${id}/approve`), {}).pipe(unwrap()); }
+  returnBack(id: string, reason: string): Observable<Row> { return this.http.post(this.u(`/objections/${id}/return`), { reason }).pipe(unwrap()); }
+ 
 }
 
 // ---------------- Notice service ----------------
